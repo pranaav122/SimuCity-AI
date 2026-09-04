@@ -86,11 +86,13 @@ class SimulationDatabase:
             conn.commit()
 
     def save_experiment_result(self, result: ExperimentResult) -> None:
-        """Persists a complete experiment result into the database."""
+        """Persists a complete experiment result into the database (idempotent — safe to re-run)."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
             cfg = result.config
+
+            # Upsert experiment row
             cursor.execute("""
             INSERT OR REPLACE INTO experiments (
                 experiment_id, name, model, number_of_agents, simulation_days, seed,
@@ -100,6 +102,11 @@ class SimulationDatabase:
                 cfg.experiment_id, cfg.name, cfg.model, cfg.number_of_agents, cfg.simulation_days, cfg.seed,
                 result.duration_seconds, result.total_ticks, result.total_tokens, result.total_cost_usd
             ))
+
+            # Delete stale child rows before re-inserting (ensures idempotency)
+            cursor.execute("DELETE FROM metrics_snapshots WHERE experiment_id = ?", (cfg.experiment_id,))
+            cursor.execute("DELETE FROM emergent_patterns WHERE experiment_id = ?", (cfg.experiment_id,))
+            cursor.execute("DELETE FROM agent_summaries WHERE experiment_id = ?", (cfg.experiment_id,))
 
             # Insert metrics snapshots
             for m in result.all_metrics:
@@ -132,6 +139,7 @@ class SimulationDatabase:
                 """, (cfg.experiment_id, a["id"], a["name"], json.dumps(a)))
 
             conn.commit()
+
 
     def list_experiments(self) -> List[Dict[str, Any]]:
         conn = self._get_connection()

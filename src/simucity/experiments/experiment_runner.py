@@ -14,14 +14,30 @@ from simucity.core.environment import CampusEnvironment
 from simucity.events.event import SimulationEvent
 from simucity.events.event_manager import EventManager
 from simucity.information.info_propagator import InformationLedger
-from simucity.llm.claude_provider import ClaudeProvider
-from simucity.llm.gemini_provider import GeminiProvider
 from simucity.llm.mock_provider import MockLLMProvider
 from simucity.llm.provider import LLMProvider
 from simucity.metrics.emergence import EmergenceDetector, EmergentPattern
 from simucity.metrics.metrics_collector import MetricsCollector, SimulationMetrics
 from simucity.social.social_network import SocialGraph
 from simucity.utils.rng import SeededRNG
+
+# Action type strings that can appear in LLM structured output
+_LLM_ACTION_MAP: Dict[str, ActionType] = {
+    "move": ActionType.MOVE,
+    "wait": ActionType.WAIT,
+    "sleep": ActionType.SLEEP,
+    "rest": ActionType.REST,
+    "eat": ActionType.EAT,
+    "study": ActionType.STUDY,
+    "attend_class": ActionType.ATTEND_CLASS,
+    "work": ActionType.WORK,
+    "purchase_item": ActionType.PURCHASE_ITEM,
+    "socialize": ActionType.SOCIALIZE,
+    "help_agent": ActionType.HELP_AGENT,
+    "share_info": ActionType.SHARE_INFO,
+}
+
+_AVAILABLE_ACTIONS = list(_LLM_ACTION_MAP.keys())
 
 
 class ExperimentConfig(BaseModel):
@@ -51,6 +67,17 @@ class ExperimentResult(BaseModel):
     agent_summaries: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+def _build_provider(model: str) -> LLMProvider:
+    """Constructs the appropriate LLM provider, raising EnvironmentError if keys are absent."""
+    if model == "claude":
+        from simucity.llm.claude_provider import ClaudeProvider  # noqa: PLC0415
+        return ClaudeProvider()
+    if model == "gemini":
+        from simucity.llm.gemini_provider import GeminiProvider  # noqa: PLC0415
+        return GeminiProvider()
+    return MockLLMProvider()
+
+
 class ExperimentRunner:
     """Orchestrates multi-agent simulation experiments with strict reproducibility."""
 
@@ -66,13 +93,9 @@ class ExperimentRunner:
         self.event_manager = EventManager()
         self.metrics_collector = MetricsCollector()
 
-        # Instantiate LLM Provider
-        if config.model == "claude":
-            self.llm_provider: LLMProvider = ClaudeProvider()
-        elif config.model == "gemini":
-            self.llm_provider = GeminiProvider()
-        else:
-            self.llm_provider = MockLLMProvider()
+        # LLM provider — may raise EnvironmentError for claude/gemini with no key
+        self.llm_provider: LLMProvider = _build_provider(config.model)
+        self._use_llm = config.model in ("claude", "gemini")
 
         self._setup_population()
         self._setup_events()
@@ -91,7 +114,6 @@ class ExperimentRunner:
             name = names[i % len(names)] if i < len(names) else f"Student_{i+1}"
             archetype = archetypes[i % len(archetypes)]
 
-            # Generate personality with controlled stochastic perturbation around archetype
             if archetype == "scholar":
                 p = Personality.scholarly_introvert()
             elif archetype == "socialite":
@@ -101,7 +123,6 @@ class ExperimentRunner:
             else:
                 p = Personality.thrifty_slacker()
 
-            # Slight seeded jitter
             p.extroversion = max(0.05, min(0.95, p.extroversion + self.rng.uniform(-0.05, 0.05)))
             p.cooperation = max(0.05, min(0.95, p.cooperation + self.rng.uniform(-0.05, 0.05)))
 
@@ -135,6 +156,62 @@ class ExperimentRunner:
         elif self.config.event_scenario == "transit_strike":
             self.event_manager.schedule_event(SimulationEvent.transit_strike(trigger_tick=96))
 
+    def _llm_to_proposed_action(
+        self, agent_id: str, structured: Optional[Dict[str, Any]], snapshot: Any
+    ) -> ProposedAction:
+        """Maps an LLM response's structured_data dict to a ProposedAction.
+
+        Falls back to WAIT if the response is absent or unparseable.
+        """
+        if not structured:
+            return ProposedAction(agent_id=agent_id, action_type=ActionType.WAIT)
+
+        raw_type = str(structured.get("action_type", "wait")).lower().strip()
+        action_type = _LLM_ACTION_MAP.get(raw_type, ActionType.WAIT)
+
+        target_loc = structured.get("target_location_id") or None
+        target_agent = structured.get("target_agent_id") or None
+        amount = float(structured.get("amount") or 0.0)
+
+        # Validate target_loc actually exists in the environment
+        if target_loc and target_loc not in self.environment.locations:
+            target_loc = None
+            if action_type == ActionType.MOVE:
+                action_type = ActionType.WAIT
+
+        # Validate target_agent is registered
+        if target_agent and target_agent not in self.agents:
+            target_agent = None
+            if action_type in (ActionType.SOCIALIZE, ActionType.HELP_AGENT, ActionType.SHARE_INFO):
+                action_type = ActionType.WAIT
+
+        return ProposedAction(
+            agent_id=agent_id,
+            action_type=action_type,
+            target_location_id=target_loc,
+            target_agent_id=target_agent,
+            amount=amount,
+        )
+
+    def _build_env_context(self, agent_id: str, snapshot: Any) -> Dict[str, Any]:
+        """Builds the environment context dict passed to the LLM for an agent's decision."""
+        agent_state = snapshot.agent_states.get(agent_id)
+        if not agent_state:
+            return {}
+        loc = self.environment.get_location(agent_state.location_id)
+        co_located = self.environment.get_co_located_agents(agent_id)
+        return {
+            "time_str": snapshot.time_str,
+            "day": snapshot.day,
+            "day_of_week": self.clock.day_of_week_name,
+            "location_id": agent_state.location_id,
+            "location_name": loc.name if loc else agent_state.location_id,
+            "money": agent_state.money,
+            "is_class_hours": self.clock.is_class_hours,
+            "co_located_agents": co_located,
+            "active_events": list(self.engine.active_events),
+        }
+
     def run(self) -> ExperimentResult:
         """Executes the full experiment across the specified simulation duration."""
         t_start = time.perf_counter()
@@ -164,10 +241,30 @@ class ExperimentRunner:
             # 3. Collect Proposed Actions
             proposed_actions: Dict[str, ProposedAction] = {}
             for agent_id, agent in self.agents.items():
-                if latest_snapshot:
-                    action = agent.evaluate_heuristic_action(latest_snapshot, self.clock, self.environment)
+                if not latest_snapshot:
+                    proposed_actions[agent_id] = ProposedAction(agent_id=agent_id, action_type=ActionType.WAIT)
+                    continue
+
+                if self._use_llm:
+                    # ── LLM PATH: ask the model to decide ──────────────────────────────
+                    agent_profile = agent.to_dict()
+                    env_context = self._build_env_context(agent_id, latest_snapshot)
+                    memories = [m.model_dump() for m in agent.memory.short_term_buffer[-5:]]
+                    llm_resp = self.llm_provider.generate_decision(
+                        agent_profile=agent_profile,
+                        environment_context=env_context,
+                        recent_memories=memories,
+                        available_actions=_AVAILABLE_ACTIONS,
+                    )
+                    if llm_resp.is_success and llm_resp.structured_data:
+                        action = self._llm_to_proposed_action(agent_id, llm_resp.structured_data, latest_snapshot)
+                    else:
+                        # LLM call failed — fall back to heuristic for this tick
+                        action = agent.evaluate_heuristic_action(latest_snapshot, self.clock, self.environment)
                 else:
-                    action = ProposedAction(agent_id=agent_id, action_type=ActionType.WAIT)
+                    # ── HEURISTIC PATH (mock): pure-Python utility decision ────────────
+                    action = agent.evaluate_heuristic_action(latest_snapshot, self.clock, self.environment)
+
                 proposed_actions[agent_id] = action
 
             # 4. Step Simulation Engine
@@ -226,7 +323,7 @@ class ExperimentRunner:
         duration_sec = time.perf_counter() - t_start
         stats = self.llm_provider.stats
 
-        result = ExperimentResult(
+        return ExperimentResult(
             config=self.config,
             duration_seconds=round(duration_sec, 2),
             total_ticks=total_ticks,
@@ -238,4 +335,3 @@ class ExperimentRunner:
             average_latency_ms=round(stats.average_latency_ms, 2),
             agent_summaries=[a.to_dict() for a in self.agents.values()],
         )
-        return result

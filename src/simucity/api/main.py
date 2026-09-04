@@ -1,28 +1,30 @@
 """FastAPI server for SimuCity AI simulation research platform."""
 
-from typing import Any, Dict, List, Optional
+import os
+from typing import Any, Dict, List, Literal, Optional
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
 from simucity.core.environment import CampusEnvironment
 from simucity.database.db import SimulationDatabase
 from simucity.experiments.experiment_runner import (
     ExperimentConfig,
-    ExperimentResult,
     ExperimentRunner,
 )
 
-import os
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-
 app = FastAPI(
     title="SimuCity AI — Autonomous Multi-Agent Simulation API",
-    description="Research-grade multi-agent simulation API for studying decision-making, cooperation, and emergent collective behavior.",
+    description=(
+        "Research-grade multi-agent simulation API for studying decision-making, "
+        "cooperation, and emergent collective behavior."
+    ),
     version="1.0.0",
 )
 
-# Enable CORS for Next.js / React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,18 +35,32 @@ app.add_middleware(
 
 db = SimulationDatabase()
 
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "frontend")
+FRONTEND_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "frontend"
+)
 if os.path.exists(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Any, exc: Exception) -> JSONResponse:
+    """Returns structured JSON for all unhandled exceptions."""
+    status = 500
+    if isinstance(exc, EnvironmentError):
+        status = 422
+    return JSONResponse(
+        status_code=status,
+        content={"detail": str(exc), "type": type(exc).__name__},
+    )
+
+
 @app.get("/")
 @app.get("/dashboard")
-def get_dashboard():
+def get_dashboard() -> FileResponse:
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"message": "SimuCity API Running. Dashboard index.html not found."}
+        return FileResponse(index_path, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Dashboard not found. Build the frontend first.")
 
 
 @app.get("/api/health")
@@ -62,12 +78,16 @@ def get_campus_topology() -> Dict[str, Any]:
     return {"locations": locs, "paths": edges}
 
 
+# ── Accepted model values ─────────────────────────────────────────────────────
+ModelLiteral = Literal["mock", "claude", "gemini"]
+
+
 class RunExperimentRequest(BaseModel):
     experiment_id: Optional[str] = None
     name: str = "Campus Emergence Study"
     number_of_agents: int = Field(default=16, ge=2, le=200)
     simulation_days: int = Field(default=3, ge=1, le=60)
-    model: str = Field(default="mock", description="'claude' | 'gemini' | 'mock'")
+    model: ModelLiteral = Field(default="mock", description="'claude' | 'gemini' | 'mock'")
     event_scenario: Optional[str] = None
     seed: int = 42
 
@@ -84,16 +104,22 @@ def run_experiment(req: RunExperimentRequest) -> Dict[str, Any]:
         event_scenario=req.event_scenario,
         seed=req.seed,
     )
-    runner = ExperimentRunner(config)
+    try:
+        runner = ExperimentRunner(config)
+    except EnvironmentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     result = runner.run()
     db.save_experiment_result(result)
     return {
         "status": "completed",
         "experiment_id": exp_id,
+        "model": req.model,
         "duration_seconds": result.duration_seconds,
         "total_ticks": result.total_ticks,
         "total_tokens": result.total_tokens,
         "total_cost_usd": result.total_cost_usd,
+        "average_latency_ms": result.average_latency_ms,
         "patterns_detected": len(result.detected_patterns),
     }
 
@@ -103,35 +129,42 @@ def list_experiments() -> List[Dict[str, Any]]:
     return db.list_experiments()
 
 
-@app.get("/api/experiments/{experiment_id}")
-def get_experiment_details(experiment_id: str) -> Dict[str, Any]:
-    data = db.get_experiment(experiment_id)
-    if not data:
-        raise HTTPException(status_code=404, detail=f"Experiment '{experiment_id}' not found.")
-    return data
-
-
 @app.get("/api/experiments/compare/models")
 def compare_models(seed: int = 42, num_agents: int = 16, days: int = 3) -> Dict[str, Any]:
-    """Runs a direct benchmark comparison between models under identical seeds and conditions."""
-    results = {}
-    for model_name in ["mock", "gemini", "claude"]:
-        exp_id = f"benchmark_{model_name}_s{seed}"
+    """Benchmarks mock (always), claude (if ANTHROPIC_API_KEY set), gemini (if GEMINI_API_KEY set).
+
+    Models with missing keys are returned as skipped with a clear reason.
+    Results are genuinely different: mock uses heuristic, claude/gemini use real API calls.
+    """
+    results: Dict[str, Any] = {}
+
+    for model_name in ["mock", "claude", "gemini"]:
+        exp_id = f"benchmark_{model_name}_s{seed}_n{num_agents}"
         config = ExperimentConfig(
             experiment_id=exp_id,
             name=f"Model Comparison: {model_name.upper()}",
             number_of_agents=num_agents,
             simulation_days=days,
-            model=model_name,
+            model=model_name,  # type: ignore[arg-type]
             seed=seed,
         )
-        runner = ExperimentRunner(config)
+        try:
+            runner = ExperimentRunner(config)
+        except EnvironmentError as exc:
+            results[model_name] = {
+                "model": model_name,
+                "skipped": True,
+                "reason": str(exc),
+            }
+            continue
+
         res = runner.run()
         db.save_experiment_result(res)
 
         final_m = res.final_metrics
         results[model_name] = {
             "model": model_name,
+            "skipped": False,
             "duration_seconds": res.duration_seconds,
             "total_tokens": res.total_tokens,
             "total_cost_usd": res.total_cost_usd,
@@ -142,4 +175,13 @@ def compare_models(seed: int = 42, num_agents: int = 16, days: int = 3) -> Dict[
             "average_stress": final_m.average_stress if final_m else 0.0,
             "patterns_detected_count": len(res.detected_patterns),
         }
+
     return results
+
+
+@app.get("/api/experiments/{experiment_id}")
+def get_experiment_details(experiment_id: str) -> Dict[str, Any]:
+    data = db.get_experiment(experiment_id)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"Experiment '{experiment_id}' not found.")
+    return data

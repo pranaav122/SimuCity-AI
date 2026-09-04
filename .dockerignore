@@ -1,0 +1,34 @@
+# Git
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+coverage.xml
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# SQLite databases
+*.db
+
+# Test outputs
+tests/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
