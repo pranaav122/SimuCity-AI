@@ -1,8 +1,7 @@
 """Unit tests for SimuAgent, Personalities, Needs, and Goals."""
 
-import pytest
 from simucity.agents.agent import SimuAgent
-from simucity.agents.goals import AgentGoal, GoalCategory, create_default_goals
+from simucity.agents.goals import create_default_goals
 from simucity.agents.needs import AgentNeeds
 from simucity.agents.personality import Personality
 from simucity.core.actions import ActionType
@@ -57,8 +56,21 @@ def test_simu_agent_heuristic_action_selection() -> None:
 
     # Agent in dorm with hunger 80 should propose moving to dining hall
     snapshot = WorldStateSnapshot(
-        tick=0, day=1, hour=12, minute=0, time_str="12:00", day_of_week="Monday",
-        agent_states={"agent_alice": AgentStateSnapshot(agent_id="agent_alice", location_id="dorm_north", money=50.0, hunger=80.0, energy=80.0)}
+        tick=0,
+        day=1,
+        hour=12,
+        minute=0,
+        time_str="12:00",
+        day_of_week="Monday",
+        agent_states={
+            "agent_alice": AgentStateSnapshot(
+                agent_id="agent_alice",
+                location_id="dorm_north",
+                money=50.0,
+                hunger=80.0,
+                energy=80.0,
+            )
+        },
     )
 
     action = agent.evaluate_heuristic_action(snapshot, clock, env)

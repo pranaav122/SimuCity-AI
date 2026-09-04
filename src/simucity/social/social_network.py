@@ -1,8 +1,8 @@
 """Campus-wide social network graph and emergent group community detector."""
 
-from typing import Any, Dict, List, Set
+from typing import Any
+
 import networkx as nx
-from networkx.algorithms import community
 
 
 class SocialGraph:
@@ -34,7 +34,7 @@ class SocialGraph:
             weight=friendship + trust - hostility,
         )
 
-    def detect_emergent_groups(self, friendship_threshold: float = 20.0) -> List[Dict[str, Any]]:
+    def detect_emergent_groups(self, friendship_threshold: float = 20.0) -> list[dict[str, Any]]:
         """Identifies organic friend clusters and study groups based on reciprocal positive relations."""
         # Create undirected sub-graph of positive bonds
         undirected_pos = nx.Graph()
@@ -58,17 +58,19 @@ class SocialGraph:
             # Calculate internal group cohesion
             subg = undirected_pos.subgraph(comp)
             cohesion = float(nx.density(subg))
-            groups.append({
-                "group_id": f"group_{idx+1}",
-                "members": members,
-                "size": len(members),
-                "cohesion": round(cohesion, 2),
-                "type": "Study Circle / Alliance" if len(members) <= 4 else "Social Club",
-            })
+            groups.append(
+                {
+                    "group_id": f"group_{idx + 1}",
+                    "members": members,
+                    "size": len(members),
+                    "cohesion": round(cohesion, 2),
+                    "type": "Study Circle / Alliance" if len(members) <= 4 else "Social Club",
+                }
+            )
 
         return groups
 
-    def get_metrics(self) -> Dict[str, float]:
+    def get_metrics(self) -> dict[str, float]:
         """Calculates global social topology metrics."""
         num_nodes = self._graph.number_of_nodes()
         if num_nodes <= 1:
@@ -105,17 +107,19 @@ class SocialGraph:
             "clustering_coefficient": round(float(clustering), 3),
         }
 
-    def to_network_data(self) -> Dict[str, Any]:
+    def to_network_data(self) -> dict[str, Any]:
         """Serializes nodes and links for frontend D3 / Canvas visualization."""
         nodes = [{"id": n, "label": n} for n in self._graph.nodes()]
         links = []
         for u, v, d in self._graph.edges(data=True):
-            links.append({
-                "source": u,
-                "target": v,
-                "trust": d.get("trust", 0),
-                "friendship": d.get("friendship", 0),
-                "hostility": d.get("hostility", 0),
-                "weight": d.get("weight", 0),
-            })
+            links.append(
+                {
+                    "source": u,
+                    "target": v,
+                    "trust": d.get("trust", 0),
+                    "friendship": d.get("friendship", 0),
+                    "hostility": d.get("hostility", 0),
+                    "weight": d.get("weight", 0),
+                }
+            )
         return {"nodes": nodes, "links": links}

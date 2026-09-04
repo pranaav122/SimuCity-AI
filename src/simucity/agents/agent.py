@@ -1,6 +1,7 @@
 """Autonomous SimuAgent cognitive core and decision pipeline."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from simucity.agents.goals import AgentGoal, create_default_goals
 from simucity.agents.needs import AgentNeeds
 from simucity.agents.personality import Personality
@@ -20,9 +21,9 @@ class SimuAgent:
         agent_id: str,
         name: str,
         age: int = 20,
-        personality: Optional[Personality] = None,
-        needs: Optional[AgentNeeds] = None,
-        goals: Optional[List[AgentGoal]] = None,
+        personality: Personality | None = None,
+        needs: AgentNeeds | None = None,
+        goals: list[AgentGoal] | None = None,
         archetype: str = "balanced",
     ) -> None:
         self.id = agent_id
@@ -32,7 +33,7 @@ class SimuAgent:
         self.needs = needs or AgentNeeds()
         self.goals = goals or create_default_goals(archetype)
         self.memory = MemoryStream()
-        self.relationships: Dict[str, Relationship] = {}
+        self.relationships: dict[str, Relationship] = {}
         self.known_info_ids: set[str] = set()
         self.current_plan: str = "Attend morning classes, study in library, socialize in cafeteria."
 
@@ -73,40 +74,60 @@ class SimuAgent:
         environment: CampusEnvironment,
     ) -> ProposedAction:
         """High-performance utility-based action policy balancing personality, homeostatic drives, and goals."""
-        curr_loc_id = world_state.agent_states[self.id].location_id if self.id in world_state.agent_states else "dorm_north"
+        curr_loc_id = (
+            world_state.agent_states[self.id].location_id
+            if self.id in world_state.agent_states
+            else "dorm_north"
+        )
         curr_loc = environment.get_location(curr_loc_id)
-        current_money = world_state.agent_states[self.id].money if self.id in world_state.agent_states else 100.0
+        current_money = (
+            world_state.agent_states[self.id].money
+            if self.id in world_state.agent_states
+            else 100.0
+        )
 
         # 1. Critical Physiological Priority: Extreme Hunger (>= 70)
         if self.needs.hunger >= 65.0 and current_money >= 4.0:
             if curr_loc.allows(LocationAffordance.EAT):
                 return ProposedAction(agent_id=self.id, action_type=ActionType.EAT)
-            return ProposedAction(agent_id=self.id, action_type=ActionType.MOVE, target_location_id="dining_hall")
+            return ProposedAction(
+                agent_id=self.id, action_type=ActionType.MOVE, target_location_id="dining_hall"
+            )
 
         # 2. Critical Physiological Priority: Severe Exhaustion (Energy <= 20) or Nighttime
         if self.needs.energy <= 20.0 or (clock.is_night and self.needs.energy <= 60.0):
             if curr_loc.allows(LocationAffordance.SLEEP):
                 return ProposedAction(agent_id=self.id, action_type=ActionType.SLEEP)
             # Find nearest dorm
-            return ProposedAction(agent_id=self.id, action_type=ActionType.MOVE, target_location_id="dorm_north")
+            return ProposedAction(
+                agent_id=self.id, action_type=ActionType.MOVE, target_location_id="dorm_north"
+            )
 
         # 3. High Academic Schedule Priority: Mon-Fri Class Hours (08:00 - 16:00)
         if clock.is_class_hours and self.needs.energy >= 25.0:
             if curr_loc.allows(LocationAffordance.ATTEND_CLASS):
                 return ProposedAction(agent_id=self.id, action_type=ActionType.ATTEND_CLASS)
-            return ProposedAction(agent_id=self.id, action_type=ActionType.MOVE, target_location_id="classroom_hall")
+            return ProposedAction(
+                agent_id=self.id, action_type=ActionType.MOVE, target_location_id="classroom_hall"
+            )
 
         # 4. Solvency / Work Priority: Very Low Money (< $15)
         if current_money < 15.0 and self.needs.energy >= 20.0:
             if curr_loc.allows(LocationAffordance.WORK) and curr_loc.is_open(clock.hour):
                 return ProposedAction(agent_id=self.id, action_type=ActionType.WORK)
-            return ProposedAction(agent_id=self.id, action_type=ActionType.MOVE, target_location_id="campus_store")
+            return ProposedAction(
+                agent_id=self.id, action_type=ActionType.MOVE, target_location_id="campus_store"
+            )
 
         # 5. Stress Relief: High Stress (>= 60)
         if self.needs.stress >= 60.0:
-            if curr_loc.allows(LocationAffordance.REST) or curr_loc.allows(LocationAffordance.EXERCISE):
+            if curr_loc.allows(LocationAffordance.REST) or curr_loc.allows(
+                LocationAffordance.EXERCISE
+            ):
                 return ProposedAction(agent_id=self.id, action_type=ActionType.REST)
-            return ProposedAction(agent_id=self.id, action_type=ActionType.MOVE, target_location_id="rec_center")
+            return ProposedAction(
+                agent_id=self.id, action_type=ActionType.MOVE, target_location_id="rec_center"
+            )
 
         # 6. Social Drive: High Extroversion or Low Social Level (<= 40)
         co_located_peers = environment.get_co_located_agents(self.id)
@@ -133,14 +154,16 @@ class SimuAgent:
         if self.personality.ambition >= 0.6 and self.needs.energy >= 30.0:
             if curr_loc.allows(LocationAffordance.STUDY):
                 return ProposedAction(agent_id=self.id, action_type=ActionType.STUDY)
-            return ProposedAction(agent_id=self.id, action_type=ActionType.MOVE, target_location_id="central_library")
+            return ProposedAction(
+                agent_id=self.id, action_type=ActionType.MOVE, target_location_id="central_library"
+            )
 
         # 8. Default fallback: Rest or Wait
         if curr_loc.allows(LocationAffordance.REST):
             return ProposedAction(agent_id=self.id, action_type=ActionType.REST)
         return ProposedAction(agent_id=self.id, action_type=ActionType.WAIT)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serializes full cognitive agent state for REST endpoints and inspection."""
         return {
             "id": self.id,

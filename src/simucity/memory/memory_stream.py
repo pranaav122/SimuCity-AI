@@ -1,7 +1,7 @@
 """Memory stream managing short-term buffering and long-term retrieval."""
 
 import uuid
-from typing import List, Optional
+
 from simucity.memory.memory_item import MemoryItem
 
 
@@ -10,8 +10,8 @@ class MemoryStream:
 
     def __init__(self, short_term_capacity: int = 15) -> None:
         self.short_term_capacity = short_term_capacity
-        self.short_term_buffer: List[MemoryItem] = []
-        self.long_term_store: List[MemoryItem] = []
+        self.short_term_buffer: list[MemoryItem] = []
+        self.long_term_store: list[MemoryItem] = []
 
     def add_memory(
         self,
@@ -20,8 +20,8 @@ class MemoryStream:
         tick: int,
         timestamp_str: str,
         emotional_valence: float = 0.0,
-        involved_agent_ids: Optional[List[str]] = None,
-        location_id: Optional[str] = None,
+        involved_agent_ids: list[str] | None = None,
+        location_id: str | None = None,
     ) -> MemoryItem:
         """Records a new episodic memory item."""
         mem = MemoryItem(
@@ -49,7 +49,7 @@ class MemoryStream:
         query: str,
         current_tick: int,
         top_k: int = 5,
-    ) -> List[MemoryItem]:
+    ) -> list[MemoryItem]:
         """Retrieves top-k most relevant memories based on composite recency, importance, and query relevance."""
         if not self.long_term_store:
             return []

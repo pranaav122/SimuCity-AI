@@ -1,6 +1,5 @@
 """Simulation event definitions and shock triggers."""
 
-from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 
@@ -12,10 +11,12 @@ class SimulationEvent(BaseModel):
     description: str
     trigger_tick: int
     duration_ticks: int = Field(default=96, description="Duration in ticks (96 ticks = 1 full day)")
-    price_multipliers: Dict[str, float] = Field(default_factory=dict, description="Location price modifiers")
+    price_multipliers: dict[str, float] = Field(
+        default_factory=dict, description="Location price modifiers"
+    )
     academic_stress_multiplier: float = 1.0
     transport_disabled: bool = False
-    rumor_content: Optional[str] = None
+    rumor_content: str | None = None
     is_active: bool = False
 
     def is_triggered(self, current_tick: int) -> bool:

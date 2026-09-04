@@ -3,7 +3,8 @@
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from simucity.llm.prompt_templates import PromptTemplates
 from simucity.llm.provider import LLMProvider, LLMResponse
 
@@ -25,12 +26,12 @@ class ClaudeProvider(LLMProvider):
     def __init__(
         self,
         model_name: str = "claude-3-5-sonnet-20241022",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ) -> None:
         super().__init__(model_name=model_name)
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "").strip()
         if not self.api_key:
-            raise EnvironmentError(_MISSING_KEY_MSG)
+            raise OSError(_MISSING_KEY_MSG)
 
     def _calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
         """Claude 3.5 Sonnet pricing: $3.00/1M input, $15.00/1M output."""
@@ -38,10 +39,10 @@ class ClaudeProvider(LLMProvider):
 
     def generate_decision(
         self,
-        agent_profile: Dict[str, Any],
-        environment_context: Dict[str, Any],
-        recent_memories: List[Dict[str, Any]],
-        available_actions: List[str],
+        agent_profile: dict[str, Any],
+        environment_context: dict[str, Any],
+        recent_memories: list[dict[str, Any]],
+        available_actions: list[str],
     ) -> LLMResponse:
         prompt = PromptTemplates.build_decision_prompt(
             agent_profile, environment_context, recent_memories, available_actions
@@ -50,11 +51,14 @@ class ClaudeProvider(LLMProvider):
 
         try:
             import urllib.request
-            req_data = json.dumps({
-                "model": self.model_name,
-                "max_tokens": 300,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode("utf-8")
+
+            req_data = json.dumps(
+                {
+                    "model": self.model_name,
+                    "max_tokens": 300,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+            ).encode("utf-8")
 
             req = urllib.request.Request(
                 "https://api.anthropic.com/v1/messages",
@@ -109,9 +113,9 @@ class ClaudeProvider(LLMProvider):
 
     def generate_dialogue(
         self,
-        speaker_profile: Dict[str, Any],
-        listener_profile: Dict[str, Any],
-        context: Dict[str, Any],
+        speaker_profile: dict[str, Any],
+        listener_profile: dict[str, Any],
+        context: dict[str, Any],
     ) -> LLMResponse:
         speaker_name = speaker_profile.get("name", "Student")
         listener_name = listener_profile.get("name", "Peer")
@@ -124,11 +128,14 @@ class ClaudeProvider(LLMProvider):
         )
         try:
             import urllib.request
-            req_data = json.dumps({
-                "model": self.model_name,
-                "max_tokens": 100,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode("utf-8")
+
+            req_data = json.dumps(
+                {
+                    "model": self.model_name,
+                    "max_tokens": 100,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+            ).encode("utf-8")
             req = urllib.request.Request(
                 "https://api.anthropic.com/v1/messages",
                 data=req_data,
@@ -147,7 +154,11 @@ class ClaudeProvider(LLMProvider):
                 duration_ms = (time.perf_counter() - t0) * 1000.0
                 resp = LLMResponse(
                     content=text,
-                    structured_data={"utterance": text, "speaker": speaker_name, "listener": listener_name},
+                    structured_data={
+                        "utterance": text,
+                        "speaker": speaker_name,
+                        "listener": listener_name,
+                    },
                     prompt_tokens=p_tokens,
                     completion_tokens=c_tokens,
                     cost_usd=self._calculate_cost(p_tokens, c_tokens),
@@ -160,17 +171,23 @@ class ClaudeProvider(LLMProvider):
         except Exception as e:
             duration_ms = (time.perf_counter() - t0) * 1000.0
             resp = LLMResponse(
-                content="", structured_data=None, prompt_tokens=0, completion_tokens=0,
-                cost_usd=0.0, latency_ms=duration_ms, model_name=self.model_name,
-                is_success=False, error=str(e),
+                content="",
+                structured_data=None,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost_usd=0.0,
+                latency_ms=duration_ms,
+                model_name=self.model_name,
+                is_success=False,
+                error=str(e),
             )
             self.stats.record_call(resp)
             return resp
 
     def generate_plan(
         self,
-        agent_profile: Dict[str, Any],
-        world_context: Dict[str, Any],
+        agent_profile: dict[str, Any],
+        world_context: dict[str, Any],
     ) -> LLMResponse:
         t0 = time.perf_counter()
         name = agent_profile.get("name", "Student")
@@ -181,11 +198,14 @@ class ClaudeProvider(LLMProvider):
         )
         try:
             import urllib.request
-            req_data = json.dumps({
-                "model": self.model_name,
-                "max_tokens": 150,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode("utf-8")
+
+            req_data = json.dumps(
+                {
+                    "model": self.model_name,
+                    "max_tokens": 150,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+            ).encode("utf-8")
             req = urllib.request.Request(
                 "https://api.anthropic.com/v1/messages",
                 data=req_data,
@@ -217,9 +237,15 @@ class ClaudeProvider(LLMProvider):
         except Exception as e:
             duration_ms = (time.perf_counter() - t0) * 1000.0
             resp = LLMResponse(
-                content="", structured_data=None, prompt_tokens=0, completion_tokens=0,
-                cost_usd=0.0, latency_ms=duration_ms, model_name=self.model_name,
-                is_success=False, error=str(e),
+                content="",
+                structured_data=None,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost_usd=0.0,
+                latency_ms=duration_ms,
+                model_name=self.model_name,
+                is_success=False,
+                error=str(e),
             )
             self.stats.record_call(resp)
             return resp

@@ -20,7 +20,13 @@ def test_memory_stream_buffering() -> None:
 def test_memory_ranked_retrieval() -> None:
     stream = MemoryStream()
     stream.add_memory("Ate breakfast alone", importance=2, tick=10, timestamp_str="08:00")
-    stream.add_memory("Alice transferred $50 to help me during financial crisis", importance=10, tick=20, timestamp_str="10:00", involved_agent_ids=["Alice"])
+    stream.add_memory(
+        "Alice transferred $50 to help me during financial crisis",
+        importance=10,
+        tick=20,
+        timestamp_str="10:00",
+        involved_agent_ids=["Alice"],
+    )
     stream.add_memory("Studied in library", importance=3, tick=25, timestamp_str="11:00")
 
     # Query with Alice and crisis keywords

@@ -7,11 +7,33 @@ class Relationship(BaseModel):
     """Represents an agent's direct social orientation towards another agent."""
 
     target_agent_id: str
-    trust: float = Field(default=0.0, ge=-100.0, le=100.0, description="Trust level: -100 (complete distrust) to +100 (unconditional trust)")
-    friendship: float = Field(default=0.0, ge=-100.0, le=100.0, description="Affection: -100 (enemies) to +100 (best friends)")
-    hostility: float = Field(default=0.0, ge=0.0, le=100.0, description="Aggression/animosity: 0 (neutral) to 100 (open feud)")
-    respect: float = Field(default=10.0, ge=0.0, le=100.0, description="Academic or status respect: 0 to 100")
-    familiarity: float = Field(default=0.0, ge=0.0, le=100.0, description="Acquaintance level: 0 (stranger) to 100 (lifelong peer)")
+    trust: float = Field(
+        default=0.0,
+        ge=-100.0,
+        le=100.0,
+        description="Trust level: -100 (complete distrust) to +100 (unconditional trust)",
+    )
+    friendship: float = Field(
+        default=0.0,
+        ge=-100.0,
+        le=100.0,
+        description="Affection: -100 (enemies) to +100 (best friends)",
+    )
+    hostility: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="Aggression/animosity: 0 (neutral) to 100 (open feud)",
+    )
+    respect: float = Field(
+        default=10.0, ge=0.0, le=100.0, description="Academic or status respect: 0 to 100"
+    )
+    familiarity: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="Acquaintance level: 0 (stranger) to 100 (lifelong peer)",
+    )
     interaction_count: int = 0
     last_interaction_tick: int = 0
 

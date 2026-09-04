@@ -1,9 +1,10 @@
 """Deterministic Simulation Engine and Action Validation System."""
 
-from typing import Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+
 from simucity.core.actions import ActionResult, ActionStatus, ActionType, ProposedAction
 from simucity.core.clock import SimulationClock
-from simucity.core.environment import CampusEnvironment, LocationAffordance, LocationType
+from simucity.core.environment import CampusEnvironment, LocationAffordance
 from simucity.core.world_state import AgentStateSnapshot, WorldStateSnapshot
 from simucity.utils.rng import SeededRNG
 
@@ -17,15 +18,19 @@ class ActionValidator:
         agent_state: AgentStateSnapshot,
         environment: CampusEnvironment,
         clock: SimulationClock,
-        price_multipliers: Dict[str, float],
-    ) -> Tuple[bool, ActionStatus, Optional[str]]:
+        price_multipliers: dict[str, float],
+    ) -> tuple[bool, ActionStatus, str | None]:
         """Validate if a proposed action is physically possible.
 
         Returns (is_valid, status, reason).
         """
         curr_loc_id = agent_state.location_id
         if curr_loc_id not in environment.locations:
-            return False, ActionStatus.FAILED_PREREQUISITE, f"Current location '{curr_loc_id}' is invalid."
+            return (
+                False,
+                ActionStatus.FAILED_PREREQUISITE,
+                f"Current location '{curr_loc_id}' is invalid.",
+            )
 
         curr_loc = environment.get_location(curr_loc_id)
         current_hour = clock.hour
@@ -34,14 +39,26 @@ class ActionValidator:
         if action.action_type == ActionType.MOVE:
             target_id = action.target_location_id
             if not target_id or target_id not in environment.locations:
-                return False, ActionStatus.FAILED_PREREQUISITE, f"Target location '{target_id}' does not exist."
+                return (
+                    False,
+                    ActionStatus.FAILED_PREREQUISITE,
+                    f"Target location '{target_id}' does not exist.",
+                )
             if target_id == curr_loc_id:
                 return False, ActionStatus.REJECTED, "Agent is already at the target location."
             target_loc = environment.get_location(target_id)
             if not target_loc.is_open(current_hour):
-                return False, ActionStatus.FAILED_PREREQUISITE, f"Location '{target_loc.name}' is closed at {clock.time_str}."
+                return (
+                    False,
+                    ActionStatus.FAILED_PREREQUISITE,
+                    f"Location '{target_loc.name}' is closed at {clock.time_str}.",
+                )
             if not target_loc.has_capacity:
-                return False, ActionStatus.CONFLICT, f"Location '{target_loc.name}' is at full capacity ({target_loc.capacity})."
+                return (
+                    False,
+                    ActionStatus.CONFLICT,
+                    f"Location '{target_loc.name}' is at full capacity ({target_loc.capacity}).",
+                )
             return True, ActionStatus.SUCCESS, None
 
         # 2. Wait / Idle
@@ -51,7 +68,11 @@ class ActionValidator:
         # 3. Sleep
         if action.action_type == ActionType.SLEEP:
             if not curr_loc.allows(LocationAffordance.SLEEP):
-                return False, ActionStatus.REJECTED, f"Cannot sleep in '{curr_loc.name}'. Requires dormitory."
+                return (
+                    False,
+                    ActionStatus.REJECTED,
+                    f"Cannot sleep in '{curr_loc.name}'. Requires dormitory.",
+                )
             return True, ActionStatus.SUCCESS, None
 
         # 4. Rest
@@ -76,9 +97,17 @@ class ActionValidator:
         # 6. Study
         if action.action_type == ActionType.STUDY:
             if not curr_loc.allows(LocationAffordance.STUDY):
-                return False, ActionStatus.REJECTED, f"Cannot study effectively in '{curr_loc.name}'."
+                return (
+                    False,
+                    ActionStatus.REJECTED,
+                    f"Cannot study effectively in '{curr_loc.name}'.",
+                )
             if agent_state.energy < 5.0:
-                return False, ActionStatus.FAILED_PREREQUISITE, "Agent is too exhausted to study (energy < 5)."
+                return (
+                    False,
+                    ActionStatus.FAILED_PREREQUISITE,
+                    "Agent is too exhausted to study (energy < 5).",
+                )
             return True, ActionStatus.SUCCESS, None
 
         # 7. Attend Class
@@ -86,17 +115,33 @@ class ActionValidator:
             if not curr_loc.allows(LocationAffordance.ATTEND_CLASS):
                 return False, ActionStatus.REJECTED, f"No classes held in '{curr_loc.name}'."
             if not clock.is_class_hours:
-                return False, ActionStatus.FAILED_PREREQUISITE, f"Classes are not in session at {clock.time_str}."
+                return (
+                    False,
+                    ActionStatus.FAILED_PREREQUISITE,
+                    f"Classes are not in session at {clock.time_str}.",
+                )
             if agent_state.energy < 5.0:
-                return False, ActionStatus.FAILED_PREREQUISITE, "Agent is too exhausted to attend class."
+                return (
+                    False,
+                    ActionStatus.FAILED_PREREQUISITE,
+                    "Agent is too exhausted to attend class.",
+                )
             return True, ActionStatus.SUCCESS, None
 
         # 8. Work (Earn money)
         if action.action_type == ActionType.WORK:
             if not curr_loc.allows(LocationAffordance.WORK):
-                return False, ActionStatus.REJECTED, f"No work shifts available in '{curr_loc.name}'."
+                return (
+                    False,
+                    ActionStatus.REJECTED,
+                    f"No work shifts available in '{curr_loc.name}'.",
+                )
             if not curr_loc.is_open(current_hour):
-                return False, ActionStatus.FAILED_PREREQUISITE, f"Location '{curr_loc.name}' is closed."
+                return (
+                    False,
+                    ActionStatus.FAILED_PREREQUISITE,
+                    f"Location '{curr_loc.name}' is closed.",
+                )
             if agent_state.energy < 10.0:
                 return False, ActionStatus.FAILED_PREREQUISITE, "Agent is too exhausted to work."
             return True, ActionStatus.SUCCESS, None
@@ -104,8 +149,16 @@ class ActionValidator:
         # 9. Purchase Item
         if action.action_type == ActionType.PURCHASE_ITEM:
             if not curr_loc.allows(LocationAffordance.PURCHASE):
-                return False, ActionStatus.REJECTED, f"No purchasing facilities in '{curr_loc.name}'."
-            item_cost = action.amount if action.amount > 0 else (curr_loc.base_cost * price_multipliers.get(curr_loc.id, 1.0))
+                return (
+                    False,
+                    ActionStatus.REJECTED,
+                    f"No purchasing facilities in '{curr_loc.name}'.",
+                )
+            item_cost = (
+                action.amount
+                if action.amount > 0
+                else (curr_loc.base_cost * price_multipliers.get(curr_loc.id, 1.0))
+            )
             if agent_state.money < item_cost:
                 return (
                     False,
@@ -117,7 +170,11 @@ class ActionValidator:
         # 10. Socialize
         if action.action_type == ActionType.SOCIALIZE:
             if not curr_loc.allows(LocationAffordance.SOCIALIZE):
-                return False, ActionStatus.REJECTED, f"Socializing is restricted in '{curr_loc.name}' (quiet area)."
+                return (
+                    False,
+                    ActionStatus.REJECTED,
+                    f"Socializing is restricted in '{curr_loc.name}' (quiet area).",
+                )
             if action.target_agent_id:
                 # Target must be co-located
                 target_loc_id = environment.get_agent_location_id(action.target_agent_id)
@@ -146,7 +203,11 @@ class ActionValidator:
                 return False, ActionStatus.REJECTED, "Share info requires a target agent."
             target_loc_id = environment.get_agent_location_id(action.target_agent_id)
             if target_loc_id != curr_loc_id:
-                return False, ActionStatus.FAILED_PREREQUISITE, "Target agent is not co-located to receive info."
+                return (
+                    False,
+                    ActionStatus.FAILED_PREREQUISITE,
+                    "Target agent is not co-located to receive info.",
+                )
             return True, ActionStatus.SUCCESS, None
 
         return True, ActionStatus.SUCCESS, None
@@ -158,18 +219,18 @@ class SimulationEngine:
     def __init__(
         self,
         seed: int = 42,
-        environment: Optional[CampusEnvironment] = None,
-        clock: Optional[SimulationClock] = None,
+        environment: CampusEnvironment | None = None,
+        clock: SimulationClock | None = None,
     ) -> None:
         self.seed = seed
         self.rng = SeededRNG(seed)
         self.clock = clock or SimulationClock()
         self.environment = environment or CampusEnvironment.create_default_campus()
-        self.agent_states: Dict[str, AgentStateSnapshot] = {}
-        self.price_multipliers: Dict[str, float] = {}
-        self.active_events: List[str] = []
-        self.history: List[WorldStateSnapshot] = []
-        self.action_logs: List[ActionResult] = []
+        self.agent_states: dict[str, AgentStateSnapshot] = {}
+        self.price_multipliers: dict[str, float] = {}
+        self.active_events: list[str] = []
+        self.history: list[WorldStateSnapshot] = []
+        self.action_logs: list[ActionResult] = []
 
     def register_agent(
         self,
@@ -192,7 +253,9 @@ class SimulationEngine:
 
         success = self.environment.move_agent(agent_id, None, initial_location_id)
         if not success:
-            raise RuntimeError(f"Could not place agent in '{initial_location_id}': capacity exceeded.")
+            raise RuntimeError(
+                f"Could not place agent in '{initial_location_id}': capacity exceeded."
+            )
 
         state = AgentStateSnapshot(
             agent_id=agent_id,
@@ -221,7 +284,7 @@ class SimulationEngine:
         if event_id in self.active_events:
             self.active_events.remove(event_id)
 
-    def step(self, proposed_actions: Optional[Dict[str, ProposedAction]] = None) -> WorldStateSnapshot:
+    def step(self, proposed_actions: dict[str, ProposedAction] | None = None) -> WorldStateSnapshot:
         """Executes a single discrete simulation tick."""
         proposed = proposed_actions or {}
         tick = self.clock.current_tick
@@ -318,7 +381,11 @@ class SimulationEngine:
                 state.current_activity = "working"
 
             elif action.action_type == ActionType.PURCHASE_ITEM:
-                cost = action.amount if action.amount > 0 else (curr_loc.base_cost * effective_price_mult)
+                cost = (
+                    action.amount
+                    if action.amount > 0
+                    else (curr_loc.base_cost * effective_price_mult)
+                )
                 result.money_delta = -cost
                 result.social_delta = 1.0
                 state.current_activity = "shopping"
@@ -378,7 +445,10 @@ class SimulationEngine:
             state.social = max(0.0, state.social - 0.2)
 
         # 3. Create Immutable Snapshot
-        occupancies = {loc_id: sorted(list(loc.occupants)) for loc_id, loc in self.environment.locations.items()}
+        occupancies = {
+            loc_id: sorted(list(loc.occupants))
+            for loc_id, loc in self.environment.locations.items()
+        }
         snapshot = WorldStateSnapshot(
             tick=tick,
             day=self.clock.day,
@@ -403,12 +473,12 @@ class SimulationEngine:
     def run_ticks(
         self,
         n_ticks: int,
-        policy_fn: Optional[Callable[[WorldStateSnapshot, str], ProposedAction]] = None,
-    ) -> List[WorldStateSnapshot]:
+        policy_fn: Callable[[WorldStateSnapshot, str], ProposedAction] | None = None,
+    ) -> list[WorldStateSnapshot]:
         """Runs the simulation for a given number of ticks with an optional decision policy."""
         snapshots = []
         for _ in range(n_ticks):
-            proposed_actions: Dict[str, ProposedAction] = {}
+            proposed_actions: dict[str, ProposedAction] = {}
             if policy_fn:
                 latest_snapshot = self.history[-1] if self.history else None
                 for agent_id in self.agent_states.keys():

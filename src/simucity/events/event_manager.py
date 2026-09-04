@@ -1,6 +1,5 @@
 """Event manager handling event lifecycles, active state changes, and engine hooks."""
 
-from typing import Dict, List
 from simucity.core.engine import SimulationEngine
 from simucity.events.event import SimulationEvent
 
@@ -9,12 +8,12 @@ class EventManager:
     """Schedules, activates, and cleans up dynamic simulation events."""
 
     def __init__(self) -> None:
-        self.events: Dict[str, SimulationEvent] = {}
+        self.events: dict[str, SimulationEvent] = {}
 
     def schedule_event(self, event: SimulationEvent) -> None:
         self.events[event.id] = event
 
-    def tick(self, current_tick: int, engine: SimulationEngine) -> List[SimulationEvent]:
+    def tick(self, current_tick: int, engine: SimulationEngine) -> list[SimulationEvent]:
         """Evaluates all events, applies modifiers to the engine, and returns newly triggered events."""
         just_activated = []
 

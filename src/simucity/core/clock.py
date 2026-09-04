@@ -1,6 +1,5 @@
 """Discrete simulation clock for SimuCity."""
 
-from typing import List
 from pydantic import BaseModel, Field
 
 
@@ -13,8 +12,14 @@ class SimulationClock(BaseModel):
     start_hour: int = Field(default=8, ge=0, le=23, description="Starting hour (0-23)")
     start_minute: int = Field(default=0, ge=0, le=59, description="Starting minute (0-59)")
 
-    DAYS_OF_WEEK: List[str] = [
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+    DAYS_OF_WEEK: list[str] = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
     ]
 
     @property

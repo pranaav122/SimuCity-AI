@@ -1,16 +1,14 @@
 """Tests for LLM providers, information propagation, and event system."""
 
-import os
 import pytest
 
 from simucity.events.event import SimulationEvent
 from simucity.events.event_manager import EventManager
 from simucity.information.info_propagator import InformationLedger
 from simucity.llm.mock_provider import MockLLMProvider
-from simucity.llm.provider import LLMResponse
-
 
 # ── Information Propagation ────────────────────────────────────────────────────
+
 
 def test_information_propagation() -> None:
     ledger = InformationLedger()
@@ -31,6 +29,7 @@ def test_information_propagation() -> None:
 
 # ── Event Manager ─────────────────────────────────────────────────────────────
 
+
 def test_event_manager_lifecycle(default_engine) -> None:  # type: ignore[no-untyped-def]
     manager = EventManager()
     event = SimulationEvent.cafeteria_price_shock(trigger_tick=4)
@@ -47,6 +46,7 @@ def test_event_manager_lifecycle(default_engine) -> None:  # type: ignore[no-unt
 
 
 # ── Mock Provider ─────────────────────────────────────────────────────────────
+
 
 def test_mock_llm_provider_telemetry() -> None:
     provider = MockLLMProvider()
@@ -97,10 +97,12 @@ def test_mock_provider_generates_dialogue() -> None:
 
 # ── Provider key validation ───────────────────────────────────────────────────
 
+
 def test_claude_provider_raises_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """ClaudeProvider must raise EnvironmentError when ANTHROPIC_API_KEY is absent."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     from simucity.llm.claude_provider import ClaudeProvider  # noqa: PLC0415
+
     with pytest.raises(EnvironmentError, match="ANTHROPIC_API_KEY"):
         ClaudeProvider()
 
@@ -110,6 +112,7 @@ def test_gemini_provider_raises_without_key(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     from simucity.llm.gemini_provider import GeminiProvider  # noqa: PLC0415
+
     with pytest.raises(EnvironmentError, match="GEMINI_API_KEY"):
         GeminiProvider()
 
@@ -119,7 +122,10 @@ def test_mock_provider_stats_accumulate() -> None:
     provider = MockLLMProvider()
     for _ in range(5):
         provider.generate_decision(
-            agent_profile={"needs": {"hunger": 10, "energy": 80}, "personality": {"extroversion": 0.5}},
+            agent_profile={
+                "needs": {"hunger": 10, "energy": 80},
+                "personality": {"extroversion": 0.5},
+            },
             environment_context={"is_class_hours": False, "co_located_agents": []},
             recent_memories=[],
             available_actions=["study"],
@@ -131,9 +137,13 @@ def test_mock_provider_stats_accumulate() -> None:
 
 # ── LLM wired into ExperimentRunner ──────────────────────────────────────────
 
+
 def test_mock_experiment_runner_does_not_call_llm() -> None:
     """Mock mode must use heuristics only — llm_provider.stats.total_calls stays 0."""
-    from simucity.experiments.experiment_runner import ExperimentConfig, ExperimentRunner  # noqa: PLC0415
+    from simucity.experiments.experiment_runner import (  # noqa: PLC0415
+        ExperimentConfig,
+        ExperimentRunner,
+    )
 
     cfg = ExperimentConfig(
         experiment_id="test_no_llm_calls",

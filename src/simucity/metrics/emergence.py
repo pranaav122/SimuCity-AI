@@ -1,8 +1,10 @@
 """Automated detection algorithms for emergent collective behaviors."""
 
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any
+
 from pydantic import BaseModel
+
 from simucity.information.info_propagator import InformationLedger
 from simucity.metrics.metrics_collector import SimulationMetrics
 from simucity.social.social_network import SocialGraph
@@ -24,7 +26,7 @@ class EmergentPattern(BaseModel):
     description: str
     confidence: float
     tick_detected: int
-    evidence: Dict[str, Any]
+    evidence: dict[str, Any]
 
 
 class EmergenceDetector:
@@ -35,8 +37,8 @@ class EmergenceDetector:
         current_tick: int,
         social_graph: SocialGraph,
         info_ledger: InformationLedger,
-        metrics_history: List[SimulationMetrics],
-    ) -> List[EmergentPattern]:
+        metrics_history: list[SimulationMetrics],
+    ) -> list[EmergentPattern]:
         patterns = []
 
         # 1. Detect Spontaneous Group Formation
@@ -63,7 +65,12 @@ class EmergenceDetector:
                         description=f"Information originated from '{info.source}' penetrated {info.reach} agents across {info.cascade_depth} hops.",
                         confidence=0.92,
                         tick_detected=current_tick,
-                        evidence={"info_id": info.id, "reach": info.reach, "depth": info.cascade_depth, "truth_value": info.truth_value},
+                        evidence={
+                            "info_id": info.id,
+                            "reach": info.reach,
+                            "depth": info.cascade_depth,
+                            "truth_value": info.truth_value,
+                        },
                     )
                 )
 
@@ -92,7 +99,7 @@ class EmergenceDetector:
                     EmergentPattern(
                         pattern_type=EmergentPatternType.SCARCITY_COOPERATION_SURGE,
                         title="Altruistic Cooperation Surge",
-                        description=f"Population cooperation increased by {((late_coop/max(0.01, early_coop))-1.0)*100:.1f}% as agents pooled resources.",
+                        description=f"Population cooperation increased by {((late_coop / max(0.01, early_coop)) - 1.0) * 100:.1f}% as agents pooled resources.",
                         confidence=0.82,
                         tick_detected=current_tick,
                         evidence={"early_coop": early_coop, "late_coop": late_coop},

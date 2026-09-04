@@ -1,7 +1,9 @@
 """Quantitative metrics calculation, Gini inequality, and population telemetry."""
 
-from typing import Any, Dict, List
+from typing import Any
+
 from pydantic import BaseModel, Field
+
 from simucity.core.actions import ActionResult, ActionType
 from simucity.core.world_state import WorldStateSnapshot
 from simucity.social.social_network import SocialGraph
@@ -14,7 +16,9 @@ class SimulationMetrics(BaseModel):
     day: int
     time_str: str
     population_size: int
-    gini_wealth: float = Field(description="Gini coefficient of wealth distribution [0.0 = perfect equality, 1.0 = total inequality]")
+    gini_wealth: float = Field(
+        description="Gini coefficient of wealth distribution [0.0 = perfect equality, 1.0 = total inequality]"
+    )
     average_money: float
     average_gpa: float
     average_knowledge: float
@@ -22,7 +26,9 @@ class SimulationMetrics(BaseModel):
     average_energy: float
     average_hunger: float
     average_social: float
-    cooperation_rate: float = Field(description="Fraction of positive social/help actions [0.0 - 1.0]")
+    cooperation_rate: float = Field(
+        description="Fraction of positive social/help actions [0.0 - 1.0]"
+    )
     conflict_count: int = 0
     active_groups_count: int = 0
     total_tokens_used: int = 0
@@ -33,10 +39,10 @@ class MetricsCollector:
     """Computes and tracks longitudinal telemetry across simulation runs."""
 
     def __init__(self) -> None:
-        self.history: List[SimulationMetrics] = []
+        self.history: list[SimulationMetrics] = []
 
     @staticmethod
-    def compute_gini(values: List[float]) -> float:
+    def compute_gini(values: list[float]) -> float:
         """Calculates exact Gini coefficient for a distribution of positive values."""
         if not values or len(values) <= 1:
             return 0.0
@@ -54,7 +60,7 @@ class MetricsCollector:
     def compute_step_metrics(
         self,
         snapshot: WorldStateSnapshot,
-        recent_actions: List[ActionResult],
+        recent_actions: list[ActionResult],
         social_graph: SocialGraph,
         total_tokens: int = 0,
         total_cost: float = 0.0,
@@ -74,7 +80,12 @@ class MetricsCollector:
         avg_social = sum(a.social for a in agents) / pop_size
 
         # Compute cooperation rate from recent actions
-        pos_social = sum(1 for a in recent_actions if a.action.action_type in (ActionType.HELP_AGENT, ActionType.SOCIALIZE, ActionType.SHARE_INFO))
+        pos_social = sum(
+            1
+            for a in recent_actions
+            if a.action.action_type
+            in (ActionType.HELP_AGENT, ActionType.SOCIALIZE, ActionType.SHARE_INFO)
+        )
         total_social_ops = max(1, len(recent_actions))
         coop_rate = pos_social / float(total_social_ops)
 
@@ -101,7 +112,7 @@ class MetricsCollector:
         self.history.append(metrics)
         return metrics
 
-    def to_timeseries_dict(self) -> Dict[str, List[Any]]:
+    def to_timeseries_dict(self) -> dict[str, list[Any]]:
         return {
             "ticks": [m.tick for m in self.history],
             "gini_wealth": [m.gini_wealth for m in self.history],

@@ -1,6 +1,5 @@
 """Unit tests for ExperimentRunner, Emergence Detection, and Database storage."""
 
-import os
 from simucity.database.db import SimulationDatabase
 from simucity.experiments.experiment_runner import (
     ExperimentConfig,

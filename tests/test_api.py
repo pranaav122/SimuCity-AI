@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
+
 from simucity.api.main import app
 
 client = TestClient(app)
@@ -87,7 +88,12 @@ def test_run_experiment_invalid_model(tmp_db: str) -> None:
     """Providing an invalid model name must return 422 Unprocessable Entity."""
     resp = client.post(
         "/api/experiments/run",
-        json={"experiment_id": "bad_model", "model": "gpt-99", "number_of_agents": 2, "simulation_days": 1},
+        json={
+            "experiment_id": "bad_model",
+            "model": "gpt-99",
+            "number_of_agents": 2,
+            "simulation_days": 1,
+        },
     )
     assert resp.status_code == 422
 
@@ -97,7 +103,12 @@ def test_run_experiment_claude_no_key(tmp_db: str, monkeypatch: pytest.MonkeyPat
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     resp = client.post(
         "/api/experiments/run",
-        json={"experiment_id": "claude_no_key", "model": "claude", "number_of_agents": 2, "simulation_days": 1},
+        json={
+            "experiment_id": "claude_no_key",
+            "model": "claude",
+            "number_of_agents": 2,
+            "simulation_days": 1,
+        },
     )
     assert resp.status_code == 422
     assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
@@ -109,7 +120,12 @@ def test_run_experiment_gemini_no_key(tmp_db: str, monkeypatch: pytest.MonkeyPat
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     resp = client.post(
         "/api/experiments/run",
-        json={"experiment_id": "gemini_no_key", "model": "gemini", "number_of_agents": 2, "simulation_days": 1},
+        json={
+            "experiment_id": "gemini_no_key",
+            "model": "gemini",
+            "number_of_agents": 2,
+            "simulation_days": 1,
+        },
     )
     assert resp.status_code == 422
     assert "GEMINI_API_KEY" in resp.json()["detail"]

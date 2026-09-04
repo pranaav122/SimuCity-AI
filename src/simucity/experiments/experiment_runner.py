@@ -1,8 +1,10 @@
 """Reproducible experiment framework, batch comparison runner, and telemetry exporter."""
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
+
 from simucity.agents.agent import SimuAgent
 from simucity.agents.goals import create_default_goals
 from simucity.agents.needs import AgentNeeds
@@ -22,7 +24,7 @@ from simucity.social.social_network import SocialGraph
 from simucity.utils.rng import SeededRNG
 
 # Action type strings that can appear in LLM structured output
-_LLM_ACTION_MAP: Dict[str, ActionType] = {
+_LLM_ACTION_MAP: dict[str, ActionType] = {
     "move": ActionType.MOVE,
     "wait": ActionType.WAIT,
     "sleep": ActionType.SLEEP,
@@ -48,7 +50,7 @@ class ExperimentConfig(BaseModel):
     number_of_agents: int = Field(default=16, ge=2, le=200)
     simulation_days: int = Field(default=3, ge=1, le=60)
     model: str = Field(default="mock", description="'claude' | 'gemini' | 'mock'")
-    event_scenario: Optional[str] = Field(default=None, description="Preset shock event ID")
+    event_scenario: str | None = Field(default=None, description="Preset shock event ID")
     seed: int = Field(default=42, description="RNG seed for deterministic reproducibility")
 
 
@@ -58,22 +60,24 @@ class ExperimentResult(BaseModel):
     config: ExperimentConfig
     duration_seconds: float
     total_ticks: int
-    final_metrics: Optional[SimulationMetrics] = None
-    all_metrics: List[SimulationMetrics] = Field(default_factory=list)
-    detected_patterns: List[EmergentPattern] = Field(default_factory=list)
+    final_metrics: SimulationMetrics | None = None
+    all_metrics: list[SimulationMetrics] = Field(default_factory=list)
+    detected_patterns: list[EmergentPattern] = Field(default_factory=list)
     total_tokens: int = 0
     total_cost_usd: float = 0.0
     average_latency_ms: float = 0.0
-    agent_summaries: List[Dict[str, Any]] = Field(default_factory=list)
+    agent_summaries: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def _build_provider(model: str) -> LLMProvider:
     """Constructs the appropriate LLM provider, raising EnvironmentError if keys are absent."""
     if model == "claude":
         from simucity.llm.claude_provider import ClaudeProvider  # noqa: PLC0415
+
         return ClaudeProvider()
     if model == "gemini":
         from simucity.llm.gemini_provider import GeminiProvider  # noqa: PLC0415
+
         return GeminiProvider()
     return MockLLMProvider()
 
@@ -86,8 +90,10 @@ class ExperimentRunner:
         self.rng = SeededRNG(config.seed)
         self.clock = SimulationClock(start_day=1, start_hour=8, start_minute=0)
         self.environment = CampusEnvironment.create_default_campus()
-        self.engine = SimulationEngine(seed=config.seed, environment=self.environment, clock=self.clock)
-        self.agents: Dict[str, SimuAgent] = {}
+        self.engine = SimulationEngine(
+            seed=config.seed, environment=self.environment, clock=self.clock
+        )
+        self.agents: dict[str, SimuAgent] = {}
         self.social_graph = SocialGraph()
         self.info_ledger = InformationLedger()
         self.event_manager = EventManager()
@@ -104,14 +110,35 @@ class ExperimentRunner:
         """Instantiates heterogeneous population with diverse personalities and goals."""
         archetypes = ["scholar", "socialite", "entrepreneur", "balanced"]
         names = [
-            "Alice", "Bob", "Charlie", "Diana", "Ethan", "Fiona", "George", "Hannah",
-            "Ian", "Julia", "Kevin", "Luna", "Marcus", "Nora", "Oliver", "Piper",
-            "Quinn", "Riley", "Sam", "Tara", "Umar", "Violet", "Will", "Xena"
+            "Alice",
+            "Bob",
+            "Charlie",
+            "Diana",
+            "Ethan",
+            "Fiona",
+            "George",
+            "Hannah",
+            "Ian",
+            "Julia",
+            "Kevin",
+            "Luna",
+            "Marcus",
+            "Nora",
+            "Oliver",
+            "Piper",
+            "Quinn",
+            "Riley",
+            "Sam",
+            "Tara",
+            "Umar",
+            "Violet",
+            "Will",
+            "Xena",
         ]
 
         for i in range(self.config.number_of_agents):
-            agent_id = f"agent_{i+1:02d}"
-            name = names[i % len(names)] if i < len(names) else f"Student_{i+1}"
+            agent_id = f"agent_{i + 1:02d}"
+            name = names[i % len(names)] if i < len(names) else f"Student_{i + 1}"
             archetype = archetypes[i % len(archetypes)]
 
             if archetype == "scholar":
@@ -150,14 +177,18 @@ class ExperimentRunner:
     def _setup_events(self) -> None:
         """Schedules preset scenario events if specified."""
         if self.config.event_scenario == "cafeteria_price_increase":
-            self.event_manager.schedule_event(SimulationEvent.cafeteria_price_shock(trigger_tick=96))
+            self.event_manager.schedule_event(
+                SimulationEvent.cafeteria_price_shock(trigger_tick=96)
+            )
         elif self.config.event_scenario == "surprise_midterm":
-            self.event_manager.schedule_event(SimulationEvent.surprise_midterm_exam(trigger_tick=96))
+            self.event_manager.schedule_event(
+                SimulationEvent.surprise_midterm_exam(trigger_tick=96)
+            )
         elif self.config.event_scenario == "transit_strike":
             self.event_manager.schedule_event(SimulationEvent.transit_strike(trigger_tick=96))
 
     def _llm_to_proposed_action(
-        self, agent_id: str, structured: Optional[Dict[str, Any]], snapshot: Any
+        self, agent_id: str, structured: dict[str, Any] | None, snapshot: Any
     ) -> ProposedAction:
         """Maps an LLM response's structured_data dict to a ProposedAction.
 
@@ -193,7 +224,7 @@ class ExperimentRunner:
             amount=amount,
         )
 
-    def _build_env_context(self, agent_id: str, snapshot: Any) -> Dict[str, Any]:
+    def _build_env_context(self, agent_id: str, snapshot: Any) -> dict[str, Any]:
         """Builds the environment context dict passed to the LLM for an agent's decision."""
         agent_state = snapshot.agent_states.get(agent_id)
         if not agent_state:
@@ -203,7 +234,7 @@ class ExperimentRunner:
         return {
             "time_str": snapshot.time_str,
             "day": snapshot.day,
-            "day_of_week": self.clock.day_of_week_name,
+            "day_of_week": self.clock.day_of_week,
             "location_id": agent_state.location_id,
             "location_name": loc.name if loc else agent_state.location_id,
             "money": agent_state.money,
@@ -239,10 +270,12 @@ class ExperimentRunner:
                     agent.sync_from_snapshot(latest_snapshot)
 
             # 3. Collect Proposed Actions
-            proposed_actions: Dict[str, ProposedAction] = {}
+            proposed_actions: dict[str, ProposedAction] = {}
             for agent_id, agent in self.agents.items():
                 if not latest_snapshot:
-                    proposed_actions[agent_id] = ProposedAction(agent_id=agent_id, action_type=ActionType.WAIT)
+                    proposed_actions[agent_id] = ProposedAction(
+                        agent_id=agent_id, action_type=ActionType.WAIT
+                    )
                     continue
 
                 if self._use_llm:
@@ -257,13 +290,19 @@ class ExperimentRunner:
                         available_actions=_AVAILABLE_ACTIONS,
                     )
                     if llm_resp.is_success and llm_resp.structured_data:
-                        action = self._llm_to_proposed_action(agent_id, llm_resp.structured_data, latest_snapshot)
+                        action = self._llm_to_proposed_action(
+                            agent_id, llm_resp.structured_data, latest_snapshot
+                        )
                     else:
                         # LLM call failed — fall back to heuristic for this tick
-                        action = agent.evaluate_heuristic_action(latest_snapshot, self.clock, self.environment)
+                        action = agent.evaluate_heuristic_action(
+                            latest_snapshot, self.clock, self.environment
+                        )
                 else:
                     # ── HEURISTIC PATH (mock): pure-Python utility decision ────────────
-                    action = agent.evaluate_heuristic_action(latest_snapshot, self.clock, self.environment)
+                    action = agent.evaluate_heuristic_action(
+                        latest_snapshot, self.clock, self.environment
+                    )
 
                 proposed_actions[agent_id] = action
 
@@ -271,7 +310,7 @@ class ExperimentRunner:
             snapshot = self.engine.step(proposed_actions)
 
             # 5. Process Social & Informational Outcomes from Action Logs
-            recent_logs = self.engine.action_logs[-len(self.agents):]
+            recent_logs = self.engine.action_logs[-len(self.agents) :]
             for log in recent_logs:
                 if log.status.value == "success":
                     act = log.action
@@ -281,10 +320,18 @@ class ExperimentRunner:
                         if agent_b:
                             rel_a = agent_a.get_or_create_relationship(act.target_agent_id)
                             rel_b = agent_b.get_or_create_relationship(act.agent_id)
-                            rel_a.modify(trust_delta=2.0, friendship_delta=3.0, current_tick=current_tick)
-                            rel_b.modify(trust_delta=2.0, friendship_delta=3.0, current_tick=current_tick)
+                            rel_a.modify(
+                                trust_delta=2.0, friendship_delta=3.0, current_tick=current_tick
+                            )
+                            rel_b.modify(
+                                trust_delta=2.0, friendship_delta=3.0, current_tick=current_tick
+                            )
                             self.social_graph.update_edge(
-                                act.agent_id, act.target_agent_id, rel_a.trust, rel_a.friendship, rel_a.hostility
+                                act.agent_id,
+                                act.target_agent_id,
+                                rel_a.trust,
+                                rel_a.friendship,
+                                rel_a.hostility,
                             )
 
                     elif act.action_type == ActionType.HELP_AGENT and act.target_agent_id:
@@ -292,7 +339,9 @@ class ExperimentRunner:
                         agent_b = self.agents.get(act.target_agent_id)
                         if agent_b:
                             rel_b = agent_b.get_or_create_relationship(act.agent_id)
-                            rel_b.modify(trust_delta=15.0, friendship_delta=10.0, current_tick=current_tick)
+                            rel_b.modify(
+                                trust_delta=15.0, friendship_delta=10.0, current_tick=current_tick
+                            )
                             agent_b.memory.add_memory(
                                 description=f"{agent_a.name} helped me with financial support (${act.amount:.2f}).",
                                 importance=8,
@@ -327,7 +376,9 @@ class ExperimentRunner:
             config=self.config,
             duration_seconds=round(duration_sec, 2),
             total_ticks=total_ticks,
-            final_metrics=self.metrics_collector.history[-1] if self.metrics_collector.history else None,
+            final_metrics=self.metrics_collector.history[-1]
+            if self.metrics_collector.history
+            else None,
             all_metrics=self.metrics_collector.history,
             detected_patterns=detected_patterns,
             total_tokens=stats.total_prompt_tokens + stats.total_completion_tokens,

@@ -1,6 +1,7 @@
 """Unit tests for the SimulationClock."""
 
 import pytest
+
 from simucity.core.clock import SimulationClock
 
 
@@ -75,4 +76,3 @@ def test_clock_properties_and_reset(default_clock: SimulationClock) -> None:
     assert default_clock.current_tick == 10
     default_clock.reset()
     assert default_clock.current_tick == 0
-

@@ -1,6 +1,5 @@
 """Unit tests for ActionValidator and action constraints."""
 
-import pytest
 from simucity.core.actions import ActionStatus, ActionType, ProposedAction
 from simucity.core.clock import SimulationClock
 from simucity.core.engine import ActionValidator
@@ -8,7 +7,9 @@ from simucity.core.environment import CampusEnvironment
 from simucity.core.world_state import AgentStateSnapshot
 
 
-def test_action_validator_valid_move(default_campus: CampusEnvironment, default_clock: SimulationClock) -> None:
+def test_action_validator_valid_move(
+    default_campus: CampusEnvironment, default_clock: SimulationClock
+) -> None:
     state = AgentStateSnapshot(agent_id="agent_1", location_id="dorm_north")
     default_campus.move_agent("agent_1", None, "dorm_north")
 
@@ -56,9 +57,7 @@ def test_action_validator_insufficient_funds_for_meal(
     assert "insufficient funds" in reason.lower()
 
 
-def test_action_validator_attend_class_out_of_hours(
-    default_campus: CampusEnvironment
-) -> None:
+def test_action_validator_attend_class_out_of_hours(default_campus: CampusEnvironment) -> None:
     # Clock at 21:00 (outside class hours 08:00 - 17:00)
     night_clock = SimulationClock(start_hour=21, start_minute=0)
     state = AgentStateSnapshot(agent_id="student_1", location_id="classroom_hall")
@@ -101,14 +100,14 @@ def test_action_validator_work_and_exhaustion(
     default_campus.move_agent("worker", None, "campus_store")
 
     action = ProposedAction(agent_id="worker", action_type=ActionType.WORK)
-    is_valid, status, _ = ActionValidator.validate(
-        action, state, default_campus, default_clock, {}
-    )
+    is_valid, status, _ = ActionValidator.validate(action, state, default_campus, default_clock, {})
     assert is_valid
     assert status == ActionStatus.SUCCESS
 
     # Exhausted worker (energy < 10)
-    state_tired = AgentStateSnapshot(agent_id="tired_worker", location_id="campus_store", energy=5.0)
+    state_tired = AgentStateSnapshot(
+        agent_id="tired_worker", location_id="campus_store", energy=5.0
+    )
     is_valid, status, reason = ActionValidator.validate(
         action, state_tired, default_campus, default_clock, {}
     )
@@ -184,7 +183,9 @@ def test_action_validator_rest_and_study_restrictions(
     assert status == ActionStatus.SUCCESS
 
     # Exhausted student trying to study (energy < 5)
-    state_exhausted = AgentStateSnapshot(agent_id="exhausted", location_id="central_library", energy=2.0)
+    state_exhausted = AgentStateSnapshot(
+        agent_id="exhausted", location_id="central_library", energy=2.0
+    )
     study_action = ProposedAction(agent_id="exhausted", action_type=ActionType.STUDY)
     is_valid, status, reason = ActionValidator.validate(
         study_action, state_exhausted, default_campus, default_clock, {}
@@ -201,7 +202,9 @@ def test_action_validator_purchase_item_checks(
     default_campus.move_agent("shopper", None, "campus_store")
 
     # Valid purchase
-    buy_action = ProposedAction(agent_id="shopper", action_type=ActionType.PURCHASE_ITEM, amount=10.0)
+    buy_action = ProposedAction(
+        agent_id="shopper", action_type=ActionType.PURCHASE_ITEM, amount=10.0
+    )
     is_valid, status, _ = ActionValidator.validate(
         buy_action, state, default_campus, default_clock, {}
     )
@@ -209,12 +212,12 @@ def test_action_validator_purchase_item_checks(
     assert status == ActionStatus.SUCCESS
 
     # Overdraft purchase
-    expensive_buy = ProposedAction(agent_id="shopper", action_type=ActionType.PURCHASE_ITEM, amount=50.0)
+    expensive_buy = ProposedAction(
+        agent_id="shopper", action_type=ActionType.PURCHASE_ITEM, amount=50.0
+    )
     is_valid, status, reason = ActionValidator.validate(
         expensive_buy, state, default_campus, default_clock, {}
     )
     assert not is_valid
     assert status == ActionStatus.FAILED_PREREQUISITE
     assert "insufficient funds" in reason.lower()
-
-

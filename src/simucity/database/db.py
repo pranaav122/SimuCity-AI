@@ -2,7 +2,8 @@
 
 import json
 import sqlite3
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from simucity.experiments.experiment_runner import ExperimentResult
 
 
@@ -93,55 +94,93 @@ class SimulationDatabase:
             cfg = result.config
 
             # Upsert experiment row
-            cursor.execute("""
+            cursor.execute(
+                """
             INSERT OR REPLACE INTO experiments (
                 experiment_id, name, model, number_of_agents, simulation_days, seed,
                 duration_seconds, total_ticks, total_tokens, total_cost_usd
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                cfg.experiment_id, cfg.name, cfg.model, cfg.number_of_agents, cfg.simulation_days, cfg.seed,
-                result.duration_seconds, result.total_ticks, result.total_tokens, result.total_cost_usd
-            ))
+            """,
+                (
+                    cfg.experiment_id,
+                    cfg.name,
+                    cfg.model,
+                    cfg.number_of_agents,
+                    cfg.simulation_days,
+                    cfg.seed,
+                    result.duration_seconds,
+                    result.total_ticks,
+                    result.total_tokens,
+                    result.total_cost_usd,
+                ),
+            )
 
             # Delete stale child rows before re-inserting (ensures idempotency)
-            cursor.execute("DELETE FROM metrics_snapshots WHERE experiment_id = ?", (cfg.experiment_id,))
-            cursor.execute("DELETE FROM emergent_patterns WHERE experiment_id = ?", (cfg.experiment_id,))
-            cursor.execute("DELETE FROM agent_summaries WHERE experiment_id = ?", (cfg.experiment_id,))
+            cursor.execute(
+                "DELETE FROM metrics_snapshots WHERE experiment_id = ?", (cfg.experiment_id,)
+            )
+            cursor.execute(
+                "DELETE FROM emergent_patterns WHERE experiment_id = ?", (cfg.experiment_id,)
+            )
+            cursor.execute(
+                "DELETE FROM agent_summaries WHERE experiment_id = ?", (cfg.experiment_id,)
+            )
 
             # Insert metrics snapshots
             for m in result.all_metrics:
-                cursor.execute("""
+                cursor.execute(
+                    """
                 INSERT INTO metrics_snapshots (
                     experiment_id, tick, day, time_str, gini_wealth, average_money,
                     average_gpa, average_stress, cooperation_rate, active_groups
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    cfg.experiment_id, m.tick, m.day, m.time_str, m.gini_wealth, m.average_money,
-                    m.average_gpa, m.average_stress, m.cooperation_rate, m.active_groups_count
-                ))
+                """,
+                    (
+                        cfg.experiment_id,
+                        m.tick,
+                        m.day,
+                        m.time_str,
+                        m.gini_wealth,
+                        m.average_money,
+                        m.average_gpa,
+                        m.average_stress,
+                        m.cooperation_rate,
+                        m.active_groups_count,
+                    ),
+                )
 
             # Insert emergent patterns
             for p in result.detected_patterns:
-                cursor.execute("""
+                cursor.execute(
+                    """
                 INSERT INTO emergent_patterns (
                     experiment_id, pattern_type, title, description, confidence, tick_detected, evidence_json
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    cfg.experiment_id, p.pattern_type.value, p.title, p.description,
-                    p.confidence, p.tick_detected, json.dumps(p.evidence)
-                ))
+                """,
+                    (
+                        cfg.experiment_id,
+                        p.pattern_type.value,
+                        p.title,
+                        p.description,
+                        p.confidence,
+                        p.tick_detected,
+                        json.dumps(p.evidence),
+                    ),
+                )
 
             # Insert agent summaries
             for a in result.agent_summaries:
-                cursor.execute("""
+                cursor.execute(
+                    """
                 INSERT INTO agent_summaries (experiment_id, agent_id, name, data_json)
                 VALUES (?, ?, ?, ?)
-                """, (cfg.experiment_id, a["id"], a["name"], json.dumps(a)))
+                """,
+                    (cfg.experiment_id, a["id"], a["name"], json.dumps(a)),
+                )
 
             conn.commit()
 
-
-    def list_experiments(self) -> List[Dict[str, Any]]:
+    def list_experiments(self) -> list[dict[str, Any]]:
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
@@ -150,7 +189,7 @@ class SimulationDatabase:
         finally:
             conn.close()
 
-    def get_experiment(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+    def get_experiment(self, experiment_id: str) -> dict[str, Any] | None:
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
@@ -161,20 +200,26 @@ class SimulationDatabase:
             exp_data = dict(row)
 
             # Get metrics
-            cursor.execute("SELECT * FROM metrics_snapshots WHERE experiment_id = ? ORDER BY tick ASC", (experiment_id,))
+            cursor.execute(
+                "SELECT * FROM metrics_snapshots WHERE experiment_id = ? ORDER BY tick ASC",
+                (experiment_id,),
+            )
             exp_data["metrics"] = [dict(r) for r in cursor.fetchall()]
 
             # Get patterns
-            cursor.execute("SELECT * FROM emergent_patterns WHERE experiment_id = ?", (experiment_id,))
+            cursor.execute(
+                "SELECT * FROM emergent_patterns WHERE experiment_id = ?", (experiment_id,)
+            )
             exp_data["patterns"] = [
                 {**dict(r), "evidence": json.loads(r["evidence_json"])} for r in cursor.fetchall()
             ]
 
             # Get agents
-            cursor.execute("SELECT * FROM agent_summaries WHERE experiment_id = ?", (experiment_id,))
+            cursor.execute(
+                "SELECT * FROM agent_summaries WHERE experiment_id = ?", (experiment_id,)
+            )
             exp_data["agents"] = [json.loads(r["data_json"]) for r in cursor.fetchall()]
 
             return exp_data
         finally:
             conn.close()
-

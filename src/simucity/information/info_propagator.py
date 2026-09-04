@@ -1,6 +1,7 @@
 """Information propagation, rumor cascading, and confidence tracking."""
 
-from typing import Any, Dict, List, Set
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -14,20 +15,26 @@ class Information(BaseModel):
     origin_tick: int
     truth_value: bool = True
     initial_confidence: float = Field(default=0.9, ge=0.0, le=1.0)
-    recipients: Set[str] = Field(default_factory=set)
-    propagation_history: List[Dict[str, Any]] = Field(default_factory=list)
+    recipients: set[str] = Field(default_factory=set)
+    propagation_history: list[dict[str, Any]] = Field(default_factory=list)
 
-    def transmit(self, sender_id: str, receiver_id: str, tick: int, sender_trust: float = 0.5) -> float:
+    def transmit(
+        self, sender_id: str, receiver_id: str, tick: int, sender_trust: float = 0.5
+    ) -> float:
         """Propagates information to a new agent. Returns updated confidence."""
         self.recipients.add(receiver_id)
         # Receiver confidence depends on sender trust
-        received_confidence = min(1.0, self.initial_confidence * max(0.2, (sender_trust + 100.0) / 200.0))
-        self.propagation_history.append({
-            "sender": sender_id,
-            "receiver": receiver_id,
-            "tick": tick,
-            "confidence": round(received_confidence, 2),
-        })
+        received_confidence = min(
+            1.0, self.initial_confidence * max(0.2, (sender_trust + 100.0) / 200.0)
+        )
+        self.propagation_history.append(
+            {
+                "sender": sender_id,
+                "receiver": receiver_id,
+                "tick": tick,
+                "confidence": round(received_confidence, 2),
+            }
+        )
         return received_confidence
 
     @property
@@ -43,7 +50,7 @@ class InformationLedger:
     """Manages all information items circulating through the simulation."""
 
     def __init__(self) -> None:
-        self.items: Dict[str, Information] = {}
+        self.items: dict[str, Information] = {}
 
     def publish_info(
         self,
@@ -73,7 +80,7 @@ class InformationLedger:
             raise KeyError(f"Information '{info_id}' not found.")
         return self.items[info_id]
 
-    def get_summary(self) -> List[Dict[str, Any]]:
+    def get_summary(self) -> list[dict[str, Any]]:
         return [
             {
                 "id": info.id,

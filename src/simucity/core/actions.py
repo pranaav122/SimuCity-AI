@@ -1,7 +1,8 @@
 """Action models, validation system, and execution outcome structures."""
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -34,12 +35,14 @@ class ProposedAction(BaseModel):
 
     agent_id: str = Field(description="ID of the agent initiating the action")
     action_type: ActionType = Field(description="Categorical type of action")
-    target_location_id: Optional[str] = Field(default=None, description="Target location for movement")
-    target_agent_id: Optional[str] = Field(default=None, description="Target agent for social actions")
-    item_id: Optional[str] = Field(default=None, description="Item to purchase or transfer")
+    target_location_id: str | None = Field(default=None, description="Target location for movement")
+    target_agent_id: str | None = Field(default=None, description="Target agent for social actions")
+    item_id: str | None = Field(default=None, description="Item to purchase or transfer")
     amount: float = Field(default=0.0, ge=0.0, description="Monetary or resource quantity")
-    info_payload: Optional[Dict[str, Any]] = Field(default=None, description="Data or rumor payload")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Arbitrary supplemental arguments")
+    info_payload: dict[str, Any] | None = Field(default=None, description="Data or rumor payload")
+    parameters: dict[str, Any] = Field(
+        default_factory=dict, description="Arbitrary supplemental arguments"
+    )
 
 
 class ActionResult(BaseModel):
@@ -47,7 +50,7 @@ class ActionResult(BaseModel):
 
     action: ProposedAction
     status: ActionStatus
-    reason: Optional[str] = None
+    reason: str | None = None
     tick: int = 0
     energy_delta: float = 0.0
     hunger_delta: float = 0.0
@@ -55,5 +58,5 @@ class ActionResult(BaseModel):
     social_delta: float = 0.0
     knowledge_delta: float = 0.0
     money_delta: float = 0.0
-    location_changed_to: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    location_changed_to: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)

@@ -1,7 +1,7 @@
 """FastAPI server for SimuCity AI simulation research platform."""
 
 import os
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,12 +64,12 @@ def get_dashboard() -> FileResponse:
 
 
 @app.get("/api/health")
-def health_check() -> Dict[str, str]:
+def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "SimuCity AI Engine", "version": "1.0.0"}
 
 
 @app.get("/api/campus/topology")
-def get_campus_topology() -> Dict[str, Any]:
+def get_campus_topology() -> dict[str, Any]:
     env = CampusEnvironment.create_default_campus()
     locs = [loc.model_dump() for loc in env.get_all_locations()]
     edges = []
@@ -83,17 +83,17 @@ ModelLiteral = Literal["mock", "claude", "gemini"]
 
 
 class RunExperimentRequest(BaseModel):
-    experiment_id: Optional[str] = None
+    experiment_id: str | None = None
     name: str = "Campus Emergence Study"
     number_of_agents: int = Field(default=16, ge=2, le=200)
     simulation_days: int = Field(default=3, ge=1, le=60)
     model: ModelLiteral = Field(default="mock", description="'claude' | 'gemini' | 'mock'")
-    event_scenario: Optional[str] = None
+    event_scenario: str | None = None
     seed: int = 42
 
 
-@app.post("/api/experiments/run", response_model=Dict[str, Any])
-def run_experiment(req: RunExperimentRequest) -> Dict[str, Any]:
+@app.post("/api/experiments/run", response_model=dict[str, Any])
+def run_experiment(req: RunExperimentRequest) -> dict[str, Any]:
     exp_id = req.experiment_id or f"exp_{req.model}_{req.seed}_{int(req.number_of_agents)}a"
     config = ExperimentConfig(
         experiment_id=exp_id,
@@ -106,7 +106,7 @@ def run_experiment(req: RunExperimentRequest) -> Dict[str, Any]:
     )
     try:
         runner = ExperimentRunner(config)
-    except EnvironmentError as exc:
+    except OSError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     result = runner.run()
@@ -124,19 +124,19 @@ def run_experiment(req: RunExperimentRequest) -> Dict[str, Any]:
     }
 
 
-@app.get("/api/experiments", response_model=List[Dict[str, Any]])
-def list_experiments() -> List[Dict[str, Any]]:
+@app.get("/api/experiments", response_model=list[dict[str, Any]])
+def list_experiments() -> list[dict[str, Any]]:
     return db.list_experiments()
 
 
 @app.get("/api/experiments/compare/models")
-def compare_models(seed: int = 42, num_agents: int = 16, days: int = 3) -> Dict[str, Any]:
+def compare_models(seed: int = 42, num_agents: int = 16, days: int = 3) -> dict[str, Any]:
     """Benchmarks mock (always), claude (if ANTHROPIC_API_KEY set), gemini (if GEMINI_API_KEY set).
 
     Models with missing keys are returned as skipped with a clear reason.
     Results are genuinely different: mock uses heuristic, claude/gemini use real API calls.
     """
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
 
     for model_name in ["mock", "claude", "gemini"]:
         exp_id = f"benchmark_{model_name}_s{seed}_n{num_agents}"
@@ -150,7 +150,7 @@ def compare_models(seed: int = 42, num_agents: int = 16, days: int = 3) -> Dict[
         )
         try:
             runner = ExperimentRunner(config)
-        except EnvironmentError as exc:
+        except OSError as exc:
             results[model_name] = {
                 "model": model_name,
                 "skipped": True,
@@ -180,7 +180,7 @@ def compare_models(seed: int = 42, num_agents: int = 16, days: int = 3) -> Dict[
 
 
 @app.get("/api/experiments/{experiment_id}")
-def get_experiment_details(experiment_id: str) -> Dict[str, Any]:
+def get_experiment_details(experiment_id: str) -> dict[str, Any]:
     data = db.get_experiment(experiment_id)
     if not data:
         raise HTTPException(status_code=404, detail=f"Experiment '{experiment_id}' not found.")

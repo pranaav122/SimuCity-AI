@@ -1,7 +1,7 @@
 """Environment topology and spatial location graph for the university campus."""
 
 from enum import Enum
-from typing import Dict, List, Optional, Set
+
 import networkx as nx
 from pydantic import BaseModel, Field
 
@@ -38,15 +38,25 @@ class Location(BaseModel):
     name: str = Field(description="Human-readable location name")
     type: LocationType = Field(description="Categorical type of the location")
     capacity: int = Field(default=50, gt=0, description="Maximum simultaneous agent capacity")
-    affordances: Set[LocationAffordance] = Field(
+    affordances: set[LocationAffordance] = Field(
         default_factory=set, description="Set of actions enabled at this location"
     )
-    base_cost: float = Field(default=0.0, ge=0.0, description="Base monetary cost to utilize amenities")
+    base_cost: float = Field(
+        default=0.0, ge=0.0, description="Base monetary cost to utilize amenities"
+    )
     opening_hour: int = Field(default=0, ge=0, le=23, description="Opening hour in 24h format")
-    closing_hour: int = Field(default=24, ge=0, le=24, description="Closing hour in 24h format (24=midnight/24h)")
-    base_noise_level: float = Field(default=0.2, ge=0.0, le=1.0, description="Base environmental noise [0-1]")
-    comfort_level: float = Field(default=0.7, ge=0.0, le=1.0, description="Rest/comfort factor [0-1]")
-    occupants: Set[str] = Field(default_factory=set, description="Set of agent IDs currently present")
+    closing_hour: int = Field(
+        default=24, ge=0, le=24, description="Closing hour in 24h format (24=midnight/24h)"
+    )
+    base_noise_level: float = Field(
+        default=0.2, ge=0.0, le=1.0, description="Base environmental noise [0-1]"
+    )
+    comfort_level: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Rest/comfort factor [0-1]"
+    )
+    occupants: set[str] = Field(
+        default_factory=set, description="Set of agent IDs currently present"
+    )
 
     def is_open(self, current_hour: int) -> bool:
         """Check if facility is open at the given hour."""
@@ -98,7 +108,7 @@ class CampusEnvironment:
     """Manages the network of spatial locations and agent movements."""
 
     def __init__(self) -> None:
-        self.locations: Dict[str, Location] = {}
+        self.locations: dict[str, Location] = {}
         self._graph: nx.Graph = nx.Graph()
 
     def add_location(self, location: Location) -> None:
@@ -116,7 +126,7 @@ class CampusEnvironment:
             raise KeyError(f"Location '{location_id}' not found in environment.")
         return self.locations[location_id]
 
-    def get_all_locations(self) -> List[Location]:
+    def get_all_locations(self) -> list[Location]:
         return list(self.locations.values())
 
     def get_travel_ticks(self, origin_id: str, destination_id: str) -> int:
@@ -133,7 +143,7 @@ class CampusEnvironment:
         except nx.NetworkXNoPath:
             return 999999  # Unreachable
 
-    def move_agent(self, agent_id: str, from_loc_id: Optional[str], to_loc_id: str) -> bool:
+    def move_agent(self, agent_id: str, from_loc_id: str | None, to_loc_id: str) -> bool:
         """Move agent from one location to another. Validates target capacity."""
         target_loc = self.get_location(to_loc_id)
         if not target_loc.has_capacity and agent_id not in target_loc.occupants:
@@ -149,13 +159,13 @@ class CampusEnvironment:
         for loc in self.locations.values():
             loc.remove_occupant(agent_id)
 
-    def get_agent_location_id(self, agent_id: str) -> Optional[str]:
+    def get_agent_location_id(self, agent_id: str) -> str | None:
         for loc in self.locations.values():
             if agent_id in loc.occupants:
                 return loc.id
         return None
 
-    def get_co_located_agents(self, agent_id: str) -> List[str]:
+    def get_co_located_agents(self, agent_id: str) -> list[str]:
         """Return all other agents in the same location as agent_id."""
         loc_id = self.get_agent_location_id(agent_id)
         if not loc_id:

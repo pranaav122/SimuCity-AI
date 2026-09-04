@@ -1,22 +1,23 @@
 """LLM Provider abstraction and telemetry interfaces."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class LLMResponse(BaseModel):
     """Encapsulates the response from an LLM call with complete telemetry."""
 
     content: str = ""
-    structured_data: Optional[Dict[str, Any]] = None
+    structured_data: dict[str, Any] | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0
     cost_usd: float = 0.0
     latency_ms: float = 0.0
     model_name: str = "mock"
     is_success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class ProviderUsageStats(BaseModel):
@@ -56,10 +57,10 @@ class LLMProvider(ABC):
     @abstractmethod
     def generate_decision(
         self,
-        agent_profile: Dict[str, Any],
-        environment_context: Dict[str, Any],
-        recent_memories: List[Dict[str, Any]],
-        available_actions: List[str],
+        agent_profile: dict[str, Any],
+        environment_context: dict[str, Any],
+        recent_memories: list[dict[str, Any]],
+        available_actions: list[str],
     ) -> LLMResponse:
         """Generates the next action decision for an agent given its internal state and surroundings."""
         pass
@@ -67,9 +68,9 @@ class LLMProvider(ABC):
     @abstractmethod
     def generate_dialogue(
         self,
-        speaker_profile: Dict[str, Any],
-        listener_profile: Dict[str, Any],
-        context: Dict[str, Any],
+        speaker_profile: dict[str, Any],
+        listener_profile: dict[str, Any],
+        context: dict[str, Any],
     ) -> LLMResponse:
         """Generates conversational dialogue between two interacting agents."""
         pass
@@ -77,8 +78,8 @@ class LLMProvider(ABC):
     @abstractmethod
     def generate_plan(
         self,
-        agent_profile: Dict[str, Any],
-        world_context: Dict[str, Any],
+        agent_profile: dict[str, Any],
+        world_context: dict[str, Any],
     ) -> LLMResponse:
         """Generates a high-level daily routine or strategic plan."""
         pass

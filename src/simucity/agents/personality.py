@@ -1,6 +1,5 @@
 """Personality profiles and psychological traits for autonomous agents."""
 
-from typing import Dict
 from pydantic import BaseModel, Field
 
 
@@ -10,15 +9,50 @@ class Personality(BaseModel):
     All trait scores are normalized in [0.0, 1.0].
     """
 
-    extroversion: float = Field(default=0.5, ge=0.0, le=1.0, description="Propensity to socialize and initiate conversations")
-    risk_tolerance: float = Field(default=0.5, ge=0.0, le=1.0, description="Willingness to spend money or take non-standard actions")
-    cooperation: float = Field(default=0.5, ge=0.0, le=1.0, description="Tendency to share resources, help others, and join groups")
-    ambition: float = Field(default=0.5, ge=0.0, le=1.0, description="Drive for high academic GPA and career achievement")
-    patience: float = Field(default=0.5, ge=0.0, le=1.0, description="Tolerance for low immediate rewards and delayed gratification")
-    trust: float = Field(default=0.5, ge=0.0, le=1.0, description="Initial baseline trust towards unfamiliar agents and rumors")
-    curiosity: float = Field(default=0.5, ge=0.0, le=1.0, description="Inclination to explore new locations and investigate information")
+    extroversion: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Propensity to socialize and initiate conversations",
+    )
+    risk_tolerance: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Willingness to spend money or take non-standard actions",
+    )
+    cooperation: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Tendency to share resources, help others, and join groups",
+    )
+    ambition: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Drive for high academic GPA and career achievement",
+    )
+    patience: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Tolerance for low immediate rewards and delayed gratification",
+    )
+    trust: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Initial baseline trust towards unfamiliar agents and rumors",
+    )
+    curiosity: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Inclination to explore new locations and investigate information",
+    )
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         return {
             "extroversion": round(self.extroversion, 2),
             "risk_tolerance": round(self.risk_tolerance, 2),

@@ -1,7 +1,8 @@
 """Unit tests for SimulationEngine and deterministic reproducibility."""
 
 import pytest
-from simucity.core.actions import ActionStatus, ActionType, ProposedAction
+
+from simucity.core.actions import ActionType, ProposedAction
 from simucity.core.clock import SimulationClock
 from simucity.core.engine import SimulationEngine
 from simucity.core.environment import CampusEnvironment
@@ -70,7 +71,9 @@ def test_engine_metabolism_passive_decay(default_engine: SimulationEngine) -> No
 
     # 4 ticks of waiting (1 hour)
     for _ in range(4):
-        default_engine.step({"idle_student": ProposedAction(agent_id="idle_student", action_type=ActionType.WAIT)})
+        default_engine.step(
+            {"idle_student": ProposedAction(agent_id="idle_student", action_type=ActionType.WAIT)}
+        )
 
     final_state = default_engine.agent_states["idle_student"]
     assert final_state.hunger > 10.0  # Hunger increased
@@ -100,15 +103,27 @@ def test_engine_deterministic_reproducibility() -> None:
             agent = snapshot.agent_states[agent_id]
             if agent.hunger > 50:
                 if agent.location_id != "dining_hall":
-                    return ProposedAction(agent_id=agent_id, action_type=ActionType.MOVE, target_location_id="dining_hall")
+                    return ProposedAction(
+                        agent_id=agent_id,
+                        action_type=ActionType.MOVE,
+                        target_location_id="dining_hall",
+                    )
                 return ProposedAction(agent_id=agent_id, action_type=ActionType.EAT)
             elif agent.energy < 30:
                 if agent.location_id != "dorm_north":
-                    return ProposedAction(agent_id=agent_id, action_type=ActionType.MOVE, target_location_id="dorm_north")
+                    return ProposedAction(
+                        agent_id=agent_id,
+                        action_type=ActionType.MOVE,
+                        target_location_id="dorm_north",
+                    )
                 return ProposedAction(agent_id=agent_id, action_type=ActionType.SLEEP)
             else:
                 if agent.location_id != "classroom_hall":
-                    return ProposedAction(agent_id=agent_id, action_type=ActionType.MOVE, target_location_id="classroom_hall")
+                    return ProposedAction(
+                        agent_id=agent_id,
+                        action_type=ActionType.MOVE,
+                        target_location_id="classroom_hall",
+                    )
                 return ProposedAction(agent_id=agent_id, action_type=ActionType.ATTEND_CLASS)
 
         snapshots = engine.run_ticks(40, policy_fn=rule_policy)
@@ -144,7 +159,9 @@ def test_engine_deterministic_reproducibility() -> None:
 
 def test_engine_work_and_study_actions(default_engine: SimulationEngine) -> None:
     # 1. Work at campus store
-    default_engine.register_agent("worker_bob", initial_location_id="campus_store", initial_money=20.0, initial_energy=80.0)
+    default_engine.register_agent(
+        "worker_bob", initial_location_id="campus_store", initial_money=20.0, initial_energy=80.0
+    )
     work_action = ProposedAction(agent_id="worker_bob", action_type=ActionType.WORK)
     snap = default_engine.step({"worker_bob": work_action})
 
@@ -154,7 +171,12 @@ def test_engine_work_and_study_actions(default_engine: SimulationEngine) -> None
     assert bob_state.current_activity == "working"
 
     # 2. Study at central library
-    default_engine.register_agent("scholar_alice", initial_location_id="central_library", initial_knowledge=10.0, initial_energy=80.0)
+    default_engine.register_agent(
+        "scholar_alice",
+        initial_location_id="central_library",
+        initial_knowledge=10.0,
+        initial_energy=80.0,
+    )
     study_action = ProposedAction(agent_id="scholar_alice", action_type=ActionType.STUDY)
     snap2 = default_engine.step({"scholar_alice": study_action})
 
@@ -189,7 +211,9 @@ def test_engine_events_and_price_multipliers(default_engine: SimulationEngine) -
     assert "inflation_surge" in default_engine.active_events
     assert default_engine.price_multipliers["dining_hall"] == 1.5
 
-    default_engine.register_agent("diner", initial_location_id="dining_hall", initial_money=50.0, initial_hunger=50.0)
+    default_engine.register_agent(
+        "diner", initial_location_id="dining_hall", initial_money=50.0, initial_hunger=50.0
+    )
     eat_action = ProposedAction(agent_id="diner", action_type=ActionType.EAT)
     snap = default_engine.step({"diner": eat_action})
 
@@ -199,4 +223,3 @@ def test_engine_events_and_price_multipliers(default_engine: SimulationEngine) -
 
     default_engine.remove_event("inflation_surge")
     assert "inflation_surge" not in default_engine.active_events
-

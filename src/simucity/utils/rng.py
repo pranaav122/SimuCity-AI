@@ -1,7 +1,8 @@
 """Deterministic Random Number Generator wrapper for reproducible simulations."""
 
 import random
-from typing import Any, List, Sequence, TypeVar
+from collections.abc import Sequence
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -40,11 +41,11 @@ class SeededRNG:
             raise IndexError("Cannot choose from an empty sequence")
         return self._rng.choice(seq)
 
-    def sample(self, population: Sequence[T], k: int) -> List[T]:
+    def sample(self, population: Sequence[T], k: int) -> list[T]:
         """Return a k length list of unique elements chosen from population."""
         return self._rng.sample(population, k)
 
-    def shuffle(self, x: List[Any]) -> None:
+    def shuffle(self, x: list[Any]) -> None:
         """Shuffle list in place deterministically."""
         self._rng.shuffle(x)
 

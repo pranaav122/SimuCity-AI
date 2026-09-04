@@ -1,6 +1,7 @@
 """Unit tests for SeededRNG utility."""
 
 import pytest
+
 from simucity.utils.rng import SeededRNG
 
 

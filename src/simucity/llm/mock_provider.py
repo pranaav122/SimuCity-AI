@@ -1,7 +1,8 @@
 """Mock LLM Provider for high-speed, zero-cost deterministic simulation & tests."""
 
 import time
-from typing import Any, Dict, List
+from typing import Any
+
 from simucity.llm.provider import LLMProvider, LLMResponse
 
 
@@ -13,10 +14,10 @@ class MockLLMProvider(LLMProvider):
 
     def generate_decision(
         self,
-        agent_profile: Dict[str, Any],
-        environment_context: Dict[str, Any],
-        recent_memories: List[Dict[str, Any]],
-        available_actions: List[str],
+        agent_profile: dict[str, Any],
+        environment_context: dict[str, Any],
+        recent_memories: list[dict[str, Any]],
+        available_actions: list[str],
     ) -> LLMResponse:
         t0 = time.perf_counter()
 
@@ -48,7 +49,9 @@ class MockLLMProvider(LLMProvider):
         structured = {
             "action_type": chosen,
             "reasoning": reason,
-            "target_location_id": "dining_hall" if chosen == "eat" else ("dorm_north" if chosen == "sleep" else "classroom_hall"),
+            "target_location_id": "dining_hall"
+            if chosen == "eat"
+            else ("dorm_north" if chosen == "sleep" else "classroom_hall"),
             "target_agent_id": co_located[0] if (chosen == "socialize" and co_located) else None,
         }
 
@@ -67,9 +70,9 @@ class MockLLMProvider(LLMProvider):
 
     def generate_dialogue(
         self,
-        speaker_profile: Dict[str, Any],
-        listener_profile: Dict[str, Any],
-        context: Dict[str, Any],
+        speaker_profile: dict[str, Any],
+        listener_profile: dict[str, Any],
+        context: dict[str, Any],
     ) -> LLMResponse:
         t0 = time.perf_counter()
         speaker_name = speaker_profile.get("name", "Student")
@@ -80,7 +83,11 @@ class MockLLMProvider(LLMProvider):
 
         resp = LLMResponse(
             content=dialogue,
-            structured_data={"utterance": dialogue, "speaker": speaker_name, "listener": listener_name},
+            structured_data={
+                "utterance": dialogue,
+                "speaker": speaker_name,
+                "listener": listener_name,
+            },
             prompt_tokens=120,
             completion_tokens=25,
             cost_usd=0.0,
@@ -93,8 +100,8 @@ class MockLLMProvider(LLMProvider):
 
     def generate_plan(
         self,
-        agent_profile: Dict[str, Any],
-        world_context: Dict[str, Any],
+        agent_profile: dict[str, Any],
+        world_context: dict[str, Any],
     ) -> LLMResponse:
         t0 = time.perf_counter()
         plan_str = "08:00 Attend lectures; 12:00 Lunch at cafeteria; 14:00 Library study; 18:00 Recreation & social; 22:00 Sleep."

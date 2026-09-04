@@ -3,7 +3,8 @@
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from simucity.llm.prompt_templates import PromptTemplates
 from simucity.llm.provider import LLMProvider, LLMResponse
 
@@ -26,7 +27,7 @@ class GeminiProvider(LLMProvider):
     def __init__(
         self,
         model_name: str = "gemini-2.0-flash",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ) -> None:
         super().__init__(model_name=model_name)
         self.api_key = (
@@ -35,7 +36,7 @@ class GeminiProvider(LLMProvider):
             or os.environ.get("GOOGLE_API_KEY", "").strip()
         )
         if not self.api_key:
-            raise EnvironmentError(_MISSING_KEY_MSG)
+            raise OSError(_MISSING_KEY_MSG)
 
     def _calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
         """Gemini 2.0 Flash pricing: $0.075/1M input, $0.30/1M output."""
@@ -44,19 +45,19 @@ class GeminiProvider(LLMProvider):
     def _get_client(self) -> Any:
         try:
             from google import genai  # type: ignore[import]
+
             return genai.Client(api_key=self.api_key)
         except ImportError as exc:
             raise ImportError(
-                "google-genai is not installed. "
-                "Install it with: pip install -e \".[gemini]\""
+                'google-genai is not installed. Install it with: pip install -e ".[gemini]"'
             ) from exc
 
     def generate_decision(
         self,
-        agent_profile: Dict[str, Any],
-        environment_context: Dict[str, Any],
-        recent_memories: List[Dict[str, Any]],
-        available_actions: List[str],
+        agent_profile: dict[str, Any],
+        environment_context: dict[str, Any],
+        recent_memories: list[dict[str, Any]],
+        available_actions: list[str],
     ) -> LLMResponse:
         prompt = PromptTemplates.build_decision_prompt(
             agent_profile, environment_context, recent_memories, available_actions
@@ -111,9 +112,9 @@ class GeminiProvider(LLMProvider):
 
     def generate_dialogue(
         self,
-        speaker_profile: Dict[str, Any],
-        listener_profile: Dict[str, Any],
-        context: Dict[str, Any],
+        speaker_profile: dict[str, Any],
+        listener_profile: dict[str, Any],
+        context: dict[str, Any],
     ) -> LLMResponse:
         speaker_name = speaker_profile.get("name", "Student")
         listener_name = listener_profile.get("name", "Peer")
@@ -131,7 +132,11 @@ class GeminiProvider(LLMProvider):
             c_tokens = getattr(response.usage_metadata, "candidates_token_count", None) or 30
             resp = LLMResponse(
                 content=text,
-                structured_data={"utterance": text, "speaker": speaker_name, "listener": listener_name},
+                structured_data={
+                    "utterance": text,
+                    "speaker": speaker_name,
+                    "listener": listener_name,
+                },
                 prompt_tokens=p_tokens,
                 completion_tokens=c_tokens,
                 cost_usd=self._calculate_cost(p_tokens, c_tokens),
@@ -144,17 +149,23 @@ class GeminiProvider(LLMProvider):
         except Exception as e:
             duration_ms = (time.perf_counter() - t0) * 1000.0
             resp = LLMResponse(
-                content="", structured_data=None, prompt_tokens=0, completion_tokens=0,
-                cost_usd=0.0, latency_ms=duration_ms, model_name=self.model_name,
-                is_success=False, error=str(e),
+                content="",
+                structured_data=None,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost_usd=0.0,
+                latency_ms=duration_ms,
+                model_name=self.model_name,
+                is_success=False,
+                error=str(e),
             )
             self.stats.record_call(resp)
             return resp
 
     def generate_plan(
         self,
-        agent_profile: Dict[str, Any],
-        world_context: Dict[str, Any],
+        agent_profile: dict[str, Any],
+        world_context: dict[str, Any],
     ) -> LLMResponse:
         name = agent_profile.get("name", "Student")
         t0 = time.perf_counter()
@@ -185,9 +196,15 @@ class GeminiProvider(LLMProvider):
         except Exception as e:
             duration_ms = (time.perf_counter() - t0) * 1000.0
             resp = LLMResponse(
-                content="", structured_data=None, prompt_tokens=0, completion_tokens=0,
-                cost_usd=0.0, latency_ms=duration_ms, model_name=self.model_name,
-                is_success=False, error=str(e),
+                content="",
+                structured_data=None,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost_usd=0.0,
+                latency_ms=duration_ms,
+                model_name=self.model_name,
+                is_success=False,
+                error=str(e),
             )
             self.stats.record_call(resp)
             return resp

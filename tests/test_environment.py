@@ -1,6 +1,7 @@
 """Unit tests for CampusEnvironment and Location graph."""
 
 import pytest
+
 from simucity.core.environment import (
     CampusEnvironment,
     Location,
@@ -111,4 +112,3 @@ def test_environment_edge_cases(default_campus: CampusEnvironment) -> None:
     # Remove agent from all
     default_campus.remove_agent_from_all("agent_x")
     assert default_campus.get_agent_location_id("agent_x") is None
-
