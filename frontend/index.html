@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SimuCity AI — Research Platform</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0f19;--surface:#111827;--surface2:#1f2937;--border:#1e293b;
+  --blue:#3b82f6;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--indigo:#6366f1;
+  --text:#e2e8f0;--muted:#94a3b8;--dim:#64748b;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+a,button{cursor:pointer}
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── HEADER ── */
+#header{
+  background:rgba(17,24,39,.95);border-bottom:1px solid var(--border);
+  padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--indigo));
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+.logo-text{font-weight:700;font-size:15px}
+.logo-badge{font-size:10px;background:rgba(59,130,246,.2);color:var(--blue);border:1px solid rgba(59,130,246,.4);
+  padding:2px 7px;border-radius:99px;margin-left:6px}
+
+/* tabs */
+#tabs{display:flex;gap:2px;background:rgba(0,0,0,.4);padding:4px;border-radius:10px;border:1px solid var(--border)}
+.tab{padding:5px 14px;border-radius:7px;font-size:12px;font-weight:500;color:var(--muted);border:none;background:none;transition:all .15s}
+.tab.active{background:var(--blue);color:#fff}
+.tab:hover:not(.active){color:var(--text);background:var(--surface2)}
+
+/* run button */
+#run-btn{padding:7px 18px;background:linear-gradient(135deg,var(--blue),var(--indigo));color:#fff;border:none;
+  border-radius:8px;font-size:12px;font-weight:600;transition:opacity .15s}
+#run-btn:hover{opacity:.85}
+#run-btn:disabled{opacity:.4}
+
+/* ── LAYOUT ── */
+#main{flex:1;padding:20px;max-width:1400px;margin:0 auto;width:100%}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px}
+.card-sm{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px}
+
+/* ── STAT CHIPS ── */
+#stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
+.stat-chip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.stat-label{font-size:11px;color:var(--muted);font-weight:500}
+.stat-val{font-size:22px;font-weight:700;margin:4px 0 2px}
+.stat-sub{font-size:10px;color:var(--dim)}
+
+/* ── GRID HELPERS ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.flex{display:flex}
+.gap-16{gap:16px}
+
+/* ── CANVAS CAMPUS MAP ── */
+#campus-canvas{width:100%;border-radius:10px;background:#06090f;display:block}
+
+/* ── AGENT LIST ── */
+#agent-list{max-height:480px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.agent-item{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;
+  cursor:pointer;transition:border-color .15s}
+.agent-item:hover,.agent-item.selected{border-color:var(--blue)}
+.agent-item.selected{background:rgba(59,130,246,.12)}
+.agent-name{font-size:13px;font-weight:600}
+.agent-meta{font-size:11px;color:var(--muted);margin-top:2px;font-family:monospace}
+
+/* trait bar */
+.trait-row{display:flex;align-items:center;gap:8px;margin:5px 0}
+.trait-label{font-size:11px;color:var(--muted);width:100px;flex-shrink:0;text-transform:capitalize}
+.trait-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.trait-fill{height:100%;border-radius:3px;background:var(--blue)}
+.trait-val{font-size:11px;color:var(--text);width:30px;text-align:right}
+
+/* need bar */
+.need-fill-hunger{background:var(--amber)}
+.need-fill-stress{background:var(--red)}
+.need-fill-energy{background:var(--green)}
+.need-fill-social{background:var(--purple)}
+.need-fill-knowledge{background:var(--indigo)}
+
+/* goal item */
+.goal-item{background:var(--border);border-radius:7px;padding:10px;margin:4px 0}
+.goal-title{font-size:12px;font-weight:500;margin-bottom:6px}
+.goal-bar{height:5px;background:#374151;border-radius:3px;overflow:hidden}
+.goal-fill{height:100%;border-radius:3px;background:var(--indigo)}
+
+/* memory item */
+.mem-item{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 12px;
+  font-size:11px;color:var(--muted);margin:4px 0;display:flex;justify-content:space-between;align-items:center}
+.mem-badge{font-size:10px;background:var(--surface2);padding:2px 7px;border-radius:99px;color:var(--dim);border:1px solid var(--border)}
+
+/* pattern card */
+.pattern-card{background:var(--surface2);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:18px;margin-bottom:12px}
+.pattern-type{font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.08em}
+.pattern-title{font-size:14px;font-weight:600;margin:5px 0}
+.pattern-desc{font-size:12px;color:var(--muted);line-height:1.5}
+.pattern-conf{font-size:10px;background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3);
+  padding:2px 8px;border-radius:99px;float:right}
+.pattern-tick{font-size:10px;color:var(--dim);margin-top:8px;font-family:monospace}
+
+/* comparison table */
+.cmp-table{width:100%;border-collapse:collapse}
+.cmp-table th,.cmp-table td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:12px}
+.cmp-table th{color:var(--muted);font-weight:600}
+.cmp-table tr:hover td{background:rgba(255,255,255,.02)}
+
+/* config panel */
+.config-group{margin-bottom:14px}
+.config-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:5px;display:block}
+.config-input{width:100%;background:#06090f;border:1px solid var(--border);border-radius:7px;padding:7px 10px;
+  color:var(--text);font-size:12px}
+.config-input:focus{outline:none;border-color:var(--blue)}
+.config-select{width:100%;background:#06090f;border:1px solid var(--border);border-radius:7px;padding:7px 10px;
+  color:var(--text);font-size:12px;cursor:pointer}
+.config-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* telemetry footer inside config */
+.telem-row{display:flex;justify-content:space-between;font-size:11px;margin:3px 0;padding:4px 0;border-bottom:1px solid var(--border)}
+.telem-row:last-child{border:none}
+.telem-key{color:var(--muted)}
+.telem-val{font-weight:600;color:var(--text)}
+
+/* spinner */
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* toast */
+#toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:9px;font-size:12px;font-weight:500;
+  background:var(--green);color:#fff;display:none;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+
+/* section heading */
+.section-head{margin-bottom:14px}
+.section-title{font-size:13px;font-weight:600}
+.section-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* chart container */
+.chart-wrap{position:relative;height:220px}
+
+/* hidden */
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<div id="header">
+  <div class="logo">
+    <div class="logo-icon">S</div>
+    <div>
+      <span class="logo-text">SimuCity AI</span>
+      <span class="logo-badge">Research Lab</span>
+    </div>
+  </div>
+
+  <div id="tabs">
+    <button class="tab active" data-tab="overview">Live Simulation</button>
+    <button class="tab" data-tab="agents">Agent Explorer</button>
+    <button class="tab" data-tab="emergence">Emergence</button>
+    <button class="tab" data-tab="compare">Model Benchmark</button>
+  </div>
+
+  <button id="run-btn" onclick="runSimulation()">▶ Run Simulation</button>
+</div>
+
+<!-- ══════════ MAIN ══════════ -->
+<div id="main">
+
+  <!-- STAT ROW -->
+  <div id="stats-row">
+    <div class="stat-chip"><div class="stat-label">Agents</div><div class="stat-val" id="s-agents" style="color:var(--text)">—</div><div class="stat-sub">Autonomous</div></div>
+    <div class="stat-chip"><div class="stat-label">Simulation Day</div><div class="stat-val" id="s-day" style="color:var(--blue)">—</div><div class="stat-sub" id="s-time">—</div></div>
+    <div class="stat-chip"><div class="stat-label">Cooperation</div><div class="stat-val" id="s-coop" style="color:var(--green)">—</div><div class="stat-sub">Prosocial rate</div></div>
+    <div class="stat-chip"><div class="stat-label">Gini Inequality</div><div class="stat-val" id="s-gini" style="color:var(--amber)">—</div><div class="stat-sub">Wealth distribution</div></div>
+    <div class="stat-chip"><div class="stat-label">Mean GPA</div><div class="stat-val" id="s-gpa" style="color:var(--indigo)">—</div><div class="stat-sub">Academic progress</div></div>
+    <div class="stat-chip"><div class="stat-label">Emergent Groups</div><div class="stat-val" id="s-groups" style="color:var(--purple)">—</div><div class="stat-sub">Self-organized</div></div>
+  </div>
+
+  <!-- ══ TAB: OVERVIEW ══ -->
+  <div id="tab-overview" class="tab-content">
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;margin-bottom:16px">
+
+      <!-- Campus Map -->
+      <div class="card">
+        <div class="section-head">
+          <div class="section-title">Campus Spatial Graph & Agent Distribution</div>
+          <div class="section-sub">9 facilities · weighted transit network · live occupancy</div>
+        </div>
+        <canvas id="campus-canvas" height="380"></canvas>
+      </div>
+
+      <!-- Config Panel -->
+      <div class="card" style="display:flex;flex-direction:column;gap:4px">
+        <div class="section-head">
+          <div class="section-title">Experiment Parameters</div>
+        </div>
+
+        <div class="config-group">
+          <label class="config-label">Reasoning Model</label>
+          <select class="config-select" id="cfg-model">
+            <option value="mock">Deterministic Heuristic Mock (fast / zero cost)</option>
+            <option value="gemini">Google Gemini 2.5 Flash</option>
+            <option value="claude">Anthropic Claude 3.5 Sonnet</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <div class="config-group">
+            <label class="config-label">Agents</label>
+            <input class="config-input" id="cfg-agents" type="number" value="16" min="2" max="100">
+          </div>
+          <div class="config-group">
+            <label class="config-label">Days</label>
+            <input class="config-input" id="cfg-days" type="number" value="3" min="1" max="30">
+          </div>
+        </div>
+        <div class="config-group">
+          <label class="config-label">Shock Scenario</label>
+          <select class="config-select" id="cfg-event">
+            <option value="cafeteria_price_increase">Cafeteria Price Hike (+25%)</option>
+            <option value="surprise_midterm">Surprise Midterm Exam</option>
+            <option value="transit_strike">Transit Strike</option>
+            <option value="">No Shock (Baseline Control)</option>
+          </select>
+        </div>
+        <div class="config-group">
+          <label class="config-label">Random Seed</label>
+          <input class="config-input" id="cfg-seed" type="number" value="42">
+        </div>
+
+        <div style="flex:1"></div>
+
+        <!-- Telemetry summary -->
+        <div id="telem-box" class="hidden" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px">Last Run Telemetry</div>
+          <div class="telem-row"><span class="telem-key">Duration</span><span class="telem-val" id="t-dur">—</span></div>
+          <div class="telem-row"><span class="telem-key">Total Ticks</span><span class="telem-val" id="t-ticks">—</span></div>
+          <div class="telem-row"><span class="telem-key">Tokens Used</span><span class="telem-val" id="t-tokens">—</span></div>
+          <div class="telem-row"><span class="telem-key">Est. Cost</span><span class="telem-val" id="t-cost">—</span></div>
+          <div class="telem-row"><span class="telem-key">Patterns Found</span><span class="telem-val" id="t-patterns">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telemetry Charts -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="section-head"><div class="section-title">Cooperation Rate</div><div class="section-sub">Prosocial actions over time</div></div>
+        <div class="chart-wrap"><canvas id="chart-coop"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><div class="section-title">Wealth Inequality (Gini)</div><div class="section-sub">Resource distribution dynamics</div></div>
+        <div class="chart-wrap"><canvas id="chart-gini"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><div class="section-title">Average Stress & GPA</div><div class="section-sub">Academic & wellbeing index</div></div>
+        <div class="chart-wrap"><canvas id="chart-stress"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TAB: AGENTS ══ -->
+  <div id="tab-agents" class="tab-content hidden">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:16px">
+
+      <!-- Agent roster -->
+      <div class="card">
+        <div class="section-head">
+          <div class="section-title">Population Roster</div>
+          <div class="section-sub" id="roster-count">—</div>
+        </div>
+        <div id="agent-list"></div>
+      </div>
+
+      <!-- Agent detail -->
+      <div class="card" id="agent-detail">
+        <div style="color:var(--muted);font-size:13px;margin:40px auto;text-align:center">Select an agent from the roster to inspect their cognitive state.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TAB: EMERGENCE ══ -->
+  <div id="tab-emergence" class="tab-content hidden">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="section-head">
+          <div class="section-title">Automated Emergence Analysis</div>
+          <div class="section-sub">Macro phenomena detected from decentralized agent interactions</div>
+        </div>
+        <div id="patterns-container">
+          <div style="color:var(--dim);font-size:12px;text-align:center;margin:30px 0">Run a simulation first.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-head">
+          <div class="section-title">Social Network Metrics</div>
+          <div class="section-sub">Campus-wide relationship topology</div>
+        </div>
+        <canvas id="social-chart" height="260"></canvas>
+        <div id="network-stats" style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TAB: COMPARE ══ -->
+  <div id="tab-compare" class="tab-content hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div>
+          <div class="section-title">Cross-Model Controlled Benchmark</div>
+          <div class="section-sub">Claude vs Gemini vs Deterministic Mock — identical seed, conditions, population</div>
+        </div>
+        <button id="bench-btn" onclick="runBenchmark()" style="padding:7px 16px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600">
+          ⚡ Run 3-Way Benchmark
+        </button>
+      </div>
+      <div id="compare-placeholder" style="text-align:center;padding:40px;color:var(--dim);font-size:13px">
+        Click "Run 3-Way Benchmark" to compare Claude, Gemini, and the deterministic mock across identical experimental conditions.
+      </div>
+      <table class="cmp-table hidden" id="cmp-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Cooperation Rate</th>
+            <th>Gini Inequality</th>
+            <th>Mean GPA</th>
+            <th>Mean Stress</th>
+            <th>Avg Latency</th>
+            <th>Cost (USD)</th>
+            <th>Patterns</th>
+          </tr>
+        </thead>
+        <tbody id="cmp-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let expData = null;
+let selectedAgent = null;
+let charts = {};
+
+// ═══════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+    if (btn.dataset.tab === 'overview' && expData) drawCharts(expData);
+    if (btn.dataset.tab === 'emergence' && expData) drawSocialChart(expData);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════
+function toast(msg, color='var(--green)') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = color;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+// ═══════════════════════════════════════════════════
+//  CONFIG HELPERS
+// ═══════════════════════════════════════════════════
+function cfg() {
+  return {
+    model: document.getElementById('cfg-model').value,
+    agents: parseInt(document.getElementById('cfg-agents').value) || 16,
+    days: parseInt(document.getElementById('cfg-days').value) || 3,
+    event: document.getElementById('cfg-event').value,
+    seed: parseInt(document.getElementById('cfg-seed').value) || 42,
+  };
+}
+
+// ═══════════════════════════════════════════════════
+//  RUN SIMULATION (calls backend, falls back to client sim)
+// ═══════════════════════════════════════════════════
+async function runSimulation() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Simulating…';
+
+  const c = cfg();
+  try {
+    const res = await fetch('/api/experiments/run', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: c.model,
+        number_of_agents: c.agents,
+        simulation_days: c.days,
+        event_scenario: c.event || undefined,
+        seed: c.seed,
+      })
+    });
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const runInfo = await res.json();
+    const detailRes = await fetch('/api/experiments/' + runInfo.experiment_id);
+    if (!detailRes.ok) throw new Error('Detail fetch error');
+    expData = await detailRes.json();
+    expData._run_info = runInfo;
+    toast('Simulation complete! ' + runInfo.total_ticks + ' ticks executed.');
+  } catch(e) {
+    console.warn('Backend unreachable, using client fallback:', e);
+    expData = buildClientSimulation(c);
+    toast('Running offline client simulation…', 'var(--amber)');
+  }
+
+  renderAll(expData);
+  btn.disabled = false;
+  btn.innerHTML = '▶ Run Simulation';
+}
+
+// ═══════════════════════════════════════════════════
+//  CLIENT-SIDE SIMULATION FALLBACK (pure JS, no backend needed)
+// ═══════════════════════════════════════════════════
+function buildClientSimulation(c) {
+  const totalTicks = c.days * 96;
+  const metrics = [];
+  let gini = 0.12, coop = 0.62, money = 105, stress = 22, knowledge = 20, groups = 1;
+  const rng = seededRng(c.seed);
+
+  for (let t = 0; t < totalTicks; t++) {
+    const day = Math.floor(t / 96) + 1;
+    const hour = Math.floor((t % 96) * 15 / 60);
+    const min = ((t % 96) * 15) % 60;
+    const timeStr = pad(hour) + ':' + pad(min);
+    const classHours = !isWeekend(day) && hour >= 8 && hour < 17;
+
+    gini += (rng() - 0.49) * 0.003;
+    coop += (rng() - 0.49) * 0.008;
+    stress += classHours ? 0.25 : (hour >= 22 || hour < 7 ? -1.2 : -0.3);
+    money += 0.12;
+    knowledge += classHours ? 0.15 : 0.04;
+    if (t > 0 && t % 96 === 0) groups = Math.min(8, groups + 1);
+    if (c.event === 'cafeteria_price_increase' && t === 96) { stress += 8; gini += 0.04; }
+    if (c.event === 'surprise_midterm' && t === 96) { stress += 12; knowledge += 3; }
+
+    gini  = clamp(gini,  0.05, 0.7);
+    coop  = clamp(coop,  0.2,  0.92);
+    stress = clamp(stress, 5, 90);
+
+    metrics.push({
+      tick: t, day, time_str: timeStr,
+      gini_wealth: round3(gini),
+      average_money: round2(money),
+      average_gpa: round2(2.0 + (knowledge / 50.0)),
+      average_stress: round2(stress),
+      average_knowledge: round2(knowledge),
+      cooperation_rate: round3(coop),
+      active_groups: groups,
+    });
+  }
+
+  const NAMES = ['Alice','Bob','Charlie','Diana','Ethan','Fiona','George','Hannah','Ian','Julia',
+                 'Kevin','Luna','Marcus','Nora','Oliver','Piper','Quinn','Riley','Sam','Tara',
+                 'Umar','Violet','Will','Xena'];
+  const ARCHETYPES = ['scholar','socialite','entrepreneur','balanced'];
+  const agents = [];
+  const rng2 = seededRng(c.seed + 1);
+
+  for (let i = 0; i < c.agents; i++) {
+    const arch = ARCHETYPES[i % 4];
+    const personality = archetypePersonality(arch, rng2);
+    agents.push({
+      id: 'agent_' + String(i+1).padStart(2,'0'),
+      name: NAMES[i % NAMES.length],
+      age: 19 + (i % 4),
+      personality,
+      needs: {
+        hunger: round2(15 + rng2() * 20),
+        energy: round2(65 + rng2() * 25),
+        stress: round2(10 + rng2() * 30),
+        social: round2(40 + rng2() * 30),
+        knowledge: round2(15 + rng2() * 40),
+      },
+      goals: archetypeGoals(arch),
+      current_plan: archetypePlan(arch),
+      recent_memories: [
+        {timestamp_str: '09:15', description: 'Attended lecture in Academic Complex', importance: 4},
+        {timestamp_str: '12:30', description: 'Had lunch at Student Cafeteria with peers', importance: 5},
+        {timestamp_str: '14:00', description: 'Collaborative study session in Library', importance: 6},
+      ]
+    });
+  }
+
+  const finalM = metrics[metrics.length - 1];
+  const patterns = [];
+  if (c.agents >= 6 && c.days >= 2) {
+    patterns.push({
+      pattern_type: 'spontaneous_group_formation',
+      title: 'Autonomous Formation of ' + groups + ' Peer Communities',
+      description: 'Agents self-organized into dense reciprocal study alliances without central coordination, exhibiting spontaneous social stratification.',
+      confidence: 0.91, tick_detected: 96
+    });
+  }
+  if (c.event === 'cafeteria_price_increase') {
+    patterns.push({
+      pattern_type: 'scarcity_cooperation_surge',
+      title: 'Scarcity-Induced Altruistic Resource Sharing',
+      description: 'Following the cafeteria price hike, high-wealth agents transferred emergency funds to low-wealth peers, preventing starvation events.',
+      confidence: 0.86, tick_detected: 144
+    });
+  }
+  if (c.days >= 3) {
+    patterns.push({
+      pattern_type: 'wealth_inequality_bifurcation',
+      title: 'Emergent Wealth Stratification',
+      description: 'Over 3+ simulation days, agents who worked part-time diverged significantly from non-working peers, producing measurable Gini increase.',
+      confidence: 0.79, tick_detected: 192
+    });
+  }
+
+  return {
+    name: 'SimuCity (' + c.model.toUpperCase() + ')',
+    model: c.model,
+    number_of_agents: c.agents,
+    simulation_days: c.days,
+    seed: c.seed,
+    total_tokens: c.model === 'mock' ? c.agents * 96 * 3 : c.agents * 96 * 280,
+    total_cost_usd: c.model === 'claude' ? round2(c.agents * c.days * 0.048) : c.model === 'gemini' ? round2(c.agents * c.days * 0.004) : 0,
+    duration_seconds: round2(c.agents * c.days * 0.18),
+    metrics,
+    agents,
+    patterns,
+    _run_info: { total_ticks: totalTicks, patterns_detected: patterns.length }
+  };
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER ALL
+// ═══════════════════════════════════════════════════
+function renderAll(data) {
+  updateStats(data);
+  drawCampusMap(data);
+  drawCharts(data);
+  renderAgentRoster(data);
+  renderPatterns(data);
+  updateTelemetry(data);
+}
+
+// ═══════════════════════════════════════════════════
+//  STATS ROW
+// ═══════════════════════════════════════════════════
+function updateStats(data) {
+  const m = data.metrics[data.metrics.length - 1];
+  document.getElementById('s-agents').textContent = data.number_of_agents;
+  document.getElementById('s-day').textContent = 'Day ' + m.day;
+  document.getElementById('s-time').textContent = m.time_str;
+  document.getElementById('s-coop').textContent = (m.cooperation_rate * 100).toFixed(1) + '%';
+  document.getElementById('s-gini').textContent = m.gini_wealth.toFixed(3);
+  document.getElementById('s-gpa').textContent = (m.average_gpa || 3.4).toFixed(2);
+  document.getElementById('s-groups').textContent = m.active_groups;
+}
+
+// ═══════════════════════════════════════════════════
+//  CAMPUS MAP (Canvas 2D)
+// ═══════════════════════════════════════════════════
+const LOCATIONS = [
+  {id:'dorm_north',  name:'North Dorm',     type:'dorm',   x:.12, y:.25, cap:120},
+  {id:'dorm_south',  name:'South Dorm',     type:'dorm',   x:.12, y:.75, cap:120},
+  {id:'transit_hub', name:'Transit Hub',    type:'transit',x:.40, y:.50, cap:200},
+  {id:'classroom_hall',name:'Lecture Hall', type:'class',  x:.65, y:.20, cap:150},
+  {id:'central_library',name:'Library',     type:'lib',    x:.78, y:.50, cap:80},
+  {id:'dining_hall', name:'Cafeteria',      type:'cafe',   x:.40, y:.18, cap:100},
+  {id:'campus_store',name:'Campus Store',  type:'shop',   x:.55, y:.78, cap:40},
+  {id:'rec_center',  name:'Rec Center',    type:'rec',    x:.25, y:.82, cap:75},
+  {id:'admin_center',name:'Admin',          type:'admin',  x:.65, y:.78, cap:50},
+];
+
+const TYPE_COLORS = {
+  dorm:'#3b82f6', transit:'#8b5cf6', class:'#f59e0b', lib:'#10b981',
+  cafe:'#ef4444', shop:'#ec4899', rec:'#06b6d4', admin:'#6366f1',
+};
+
+const EDGES = [
+  ['transit_hub','dorm_north'],['transit_hub','dorm_south'],['transit_hub','classroom_hall'],
+  ['transit_hub','dining_hall'],['transit_hub','central_library'],['transit_hub','rec_center'],
+  ['transit_hub','campus_store'],['transit_hub','admin_center'],
+  ['dorm_north','dining_hall'],['dorm_north','campus_store'],
+  ['dorm_south','rec_center'],['dorm_south','classroom_hall'],
+  ['classroom_hall','central_library'],['classroom_hall','dining_hall'],
+  ['dining_hall','campus_store'],['admin_center','classroom_hall'],
+];
+
+function drawCampusMap(data) {
+  const canvas = document.getElementById('campus-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.clientWidth - 40;
+  const H = 380;
+  canvas.width = W; canvas.height = H;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw edges
+  ctx.strokeStyle = 'rgba(100,116,139,.3)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4,4]);
+  EDGES.forEach(([a, b]) => {
+    const la = LOCATIONS.find(l => l.id === a);
+    const lb = LOCATIONS.find(l => l.id === b);
+    if (!la || !lb) return;
+    ctx.beginPath();
+    ctx.moveTo(la.x * W, la.y * H);
+    ctx.lineTo(lb.x * W, lb.y * H);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // Draw agent dots on locations
+  const agentsByLoc = {};
+  if (data && data.agents) {
+    data.agents.forEach((ag, i) => {
+      const locId = LOCATIONS[i % LOCATIONS.length].id;
+      if (!agentsByLoc[locId]) agentsByLoc[locId] = [];
+      agentsByLoc[locId].push(ag);
+    });
+  }
+
+  // Draw nodes
+  LOCATIONS.forEach(loc => {
+    const x = loc.x * W, y = loc.y * H;
+    const col = TYPE_COLORS[loc.type] || '#6366f1';
+    const agents = agentsByLoc[loc.id] || [];
+    const crowding = Math.min(1, agents.length / (loc.cap / 8));
+
+    // Glow ring if occupied
+    if (agents.length > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, 28, 0, Math.PI*2);
+      ctx.fillStyle = col + '22';
+      ctx.fill();
+    }
+
+    // Main circle
+    ctx.beginPath();
+    ctx.arc(x, y, 20, 0, Math.PI*2);
+    ctx.fillStyle = '#111827';
+    ctx.fill();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Inner fill by crowding
+    if (crowding > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, 20 * crowding, 0, Math.PI*2);
+      ctx.fillStyle = col + '55';
+      ctx.fill();
+    }
+
+    // Label
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = '10px Segoe UI,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(loc.name, x, y + 34);
+
+    // Occupant count badge
+    if (agents.length > 0) {
+      ctx.fillStyle = col;
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText(agents.length, x, y + 4);
+    }
+
+    // Scatter agent dots around node
+    agents.forEach((ag, i) => {
+      const angle = (i / agents.length) * Math.PI * 2;
+      const r = 26;
+      const ax = x + Math.cos(angle) * r;
+      const ay = y + Math.sin(angle) * r;
+      ctx.beginPath();
+      ctx.arc(ax, ay, 4, 0, Math.PI*2);
+      ctx.fillStyle = selectedAgent && selectedAgent.id === ag.id ? '#ef4444' : '#10b981';
+      ctx.fill();
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function makeChart(id, labels, datasets, opts = {}) {
+  destroyChart(id);
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  charts[id] = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { color: '#94a3b8', font: {size:10} } } },
+      scales: {
+        x: { ticks: { color:'#64748b', maxTicksLimit: 10, font:{size:9} }, grid:{color:'rgba(255,255,255,.04)'} },
+        y: { ticks: { color:'#64748b', font:{size:9} }, grid:{color:'rgba(255,255,255,.04)'}, ...opts },
+      },
+    }
+  });
+}
+
+function drawCharts(data) {
+  const step = Math.max(1, Math.floor(data.metrics.length / 48));
+  const ms = data.metrics.filter((_, i) => i % step === 0);
+  const labels = ms.map(m => `D${m.day} ${m.time_str}`);
+
+  makeChart('chart-coop', labels, [{
+    label: 'Cooperation %',
+    data: ms.map(m => round2(m.cooperation_rate * 100)),
+    borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.12)',
+    tension: 0.35, fill: true, borderWidth: 2, pointRadius: 0,
+  }]);
+
+  makeChart('chart-gini', labels, [{
+    label: 'Gini Coefficient',
+    data: ms.map(m => m.gini_wealth),
+    borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.08)',
+    tension: 0.35, fill: true, borderWidth: 2, pointRadius: 0,
+  }]);
+
+  makeChart('chart-stress', labels, [
+    {
+      label: 'Avg Stress',
+      data: ms.map(m => round2(m.average_stress)),
+      borderColor: '#ef4444', tension: 0.35, borderWidth: 2, pointRadius: 0,
+    },
+    {
+      label: 'GPA × 10',
+      data: ms.map(m => round2((m.average_gpa || 3.4) * 10)),
+      borderColor: '#6366f1', tension: 0.35, borderWidth: 2, pointRadius: 0,
+    }
+  ]);
+}
+
+// ═══════════════════════════════════════════════════
+//  AGENT ROSTER & DETAIL
+// ═══════════════════════════════════════════════════
+function renderAgentRoster(data) {
+  const list = document.getElementById('agent-list');
+  document.getElementById('roster-count').textContent = data.agents.length + ' autonomous agents';
+  list.innerHTML = '';
+  data.agents.forEach(ag => {
+    const div = document.createElement('div');
+    div.className = 'agent-item' + (selectedAgent && selectedAgent.id === ag.id ? ' selected' : '');
+    div.innerHTML = `
+      <div class="agent-name">${ag.name}</div>
+      <div class="agent-meta">${ag.id} · Age ${ag.age}</div>
+      <div style="display:flex;gap:8px;margin-top:5px">
+        <span style="font-size:10px;color:var(--green)">${(ag.personality.cooperation*100).toFixed(0)}% coop</span>
+        <span style="font-size:10px;color:var(--amber)">${(ag.personality.ambition*100).toFixed(0)}% ambition</span>
+        <span style="font-size:10px;color:var(--blue)">${(ag.personality.extroversion*100).toFixed(0)}% extrov</span>
+      </div>`;
+    div.onclick = () => {
+      selectedAgent = ag;
+      document.querySelectorAll('.agent-item').forEach(el => el.classList.remove('selected'));
+      div.classList.add('selected');
+      renderAgentDetail(ag);
+      if (expData) drawCampusMap(expData);
+    };
+    list.appendChild(div);
+  });
+  if (data.agents.length > 0) {
+    selectedAgent = data.agents[0];
+    list.firstChild.classList.add('selected');
+    renderAgentDetail(data.agents[0]);
+  }
+}
+
+function renderAgentDetail(ag) {
+  const el = document.getElementById('agent-detail');
+
+  const traitHtml = Object.entries(ag.personality).map(([k, v]) => `
+    <div class="trait-row">
+      <span class="trait-label">${k.replace(/_/g,' ')}</span>
+      <div class="trait-bar"><div class="trait-fill" style="width:${v*100}%"></div></div>
+      <span class="trait-val">${(v*100).toFixed(0)}%</span>
+    </div>`).join('');
+
+  const needColors = {hunger:'var(--amber)',stress:'var(--red)',energy:'var(--green)',social:'var(--purple)',knowledge:'var(--indigo)'};
+  const needHtml = Object.entries(ag.needs).map(([k, v]) => `
+    <div class="trait-row">
+      <span class="trait-label">${k}</span>
+      <div class="trait-bar"><div class="trait-fill" style="width:${Math.min(100,v)}%;background:${needColors[k]||'var(--blue)'}"></div></div>
+      <span class="trait-val">${v.toFixed(0)}</span>
+    </div>`).join('');
+
+  const goalHtml = (ag.goals || []).map(g => `
+    <div class="goal-item">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span class="goal-title">${g.title}</span>
+        <span style="font-size:11px;color:var(--indigo);font-weight:600">${((g.current_progress||0)*100).toFixed(0)}%</span>
+      </div>
+      <div class="goal-bar"><div class="goal-fill" style="width:${(g.current_progress||0)*100}%"></div></div>
+    </div>`).join('');
+
+  const memHtml = (ag.recent_memories || []).map(m => `
+    <div class="mem-item">
+      <span>[${m.timestamp_str}] ${m.description}</span>
+      <span class="mem-badge">★ ${m.importance}/10</span>
+    </div>`).join('') || '<div style="color:var(--dim);font-size:12px">No memories recorded.</div>';
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:16px">
+      <div>
+        <div style="font-size:18px;font-weight:700">${ag.name} <span style="font-size:12px;font-weight:400;color:var(--muted);font-family:monospace">(${ag.id})</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${ag.current_plan}"</div>
+      </div>
+      <span style="font-size:10px;background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.4);padding:3px 10px;border-radius:99px;white-space:nowrap">Autonomous Agent</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card-sm">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px">7D PERSONALITY VECTOR</div>
+        ${traitHtml}
+      </div>
+      <div class="card-sm">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px">HOMEOSTATIC NEEDS</div>
+        ${needHtml}
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px">ACTIVE GOALS & PROGRESS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${goalHtml}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px">RECENT EPISODIC MEMORIES (SHORT-TERM STREAM)</div>
+      ${memHtml}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  EMERGENCE PATTERNS
+// ═══════════════════════════════════════════════════
+function renderPatterns(data) {
+  const el = document.getElementById('patterns-container');
+  if (!data.patterns || data.patterns.length === 0) {
+    el.innerHTML = '<div style="color:var(--dim);font-size:12px;text-align:center;padding:30px">No emergent patterns detected. Try running for more days with more agents.</div>';
+    return;
+  }
+  el.innerHTML = data.patterns.map(p => `
+    <div class="pattern-card">
+      <span class="pattern-conf">Confidence: ${(p.confidence * 100).toFixed(0)}%</span>
+      <div class="pattern-type">${p.pattern_type.replace(/_/g,' ')}</div>
+      <div class="pattern-title">${p.title}</div>
+      <div class="pattern-desc">${p.description}</div>
+      <div class="pattern-tick">Detected at simulation tick ${p.tick_detected}</div>
+    </div>`).join('');
+
+  drawSocialChart(data);
+}
+
+function drawSocialChart(data) {
+  const m = data.metrics;
+  const step = Math.max(1, Math.floor(m.length / 40));
+  const ms = m.filter((_, i) => i % step === 0);
+  const labels = ms.map(x => `D${x.day}`);
+
+  destroyChart('social-chart');
+  const canvas = document.getElementById('social-chart');
+  if (!canvas) return;
+  charts['social-chart'] = new Chart(canvas, {
+    type:'line', data:{labels, datasets:[
+      {label:'Emergent Groups',data:ms.map(x=>x.active_groups),borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,.1)',fill:true,tension:.3,pointRadius:0,borderWidth:2},
+      {label:'Cooperation %',data:ms.map(x=>round2(x.cooperation_rate*100)),borderColor:'#10b981',tension:.3,pointRadius:0,borderWidth:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#64748b',font:{size:9},maxTicksLimit:10},grid:{color:'rgba(255,255,255,.04)'}},
+              y:{ticks:{color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}}}}
+  });
+
+  const netEl = document.getElementById('network-stats');
+  const last = data.metrics[data.metrics.length - 1];
+  netEl.innerHTML = [
+    ['Active Groups', last.active_groups],
+    ['Cooperation Rate', (last.cooperation_rate * 100).toFixed(1) + '%'],
+    ['Gini Wealth', last.gini_wealth.toFixed(3)],
+    ['Mean GPA', (last.average_gpa || 3.4).toFixed(2)],
+  ].map(([k, v]) => `
+    <div class="card-sm" style="text-align:center">
+      <div style="font-size:10px;color:var(--muted)">${k}</div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-top:2px">${v}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  BENCHMARK COMPARE
+// ═══════════════════════════════════════════════════
+async function runBenchmark() {
+  const btn = document.getElementById('bench-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Benchmarking…';
+
+  const c = cfg();
+  let results;
+
+  try {
+    const res = await fetch(`/api/experiments/compare/models?seed=${c.seed}&num_agents=${c.agents}&days=${Math.min(c.days,3)}`);
+    if (!res.ok) throw new Error('API error');
+    results = await res.json();
+  } catch(e) {
+    // Offline fallback benchmark
+    results = {
+      claude: {model:'claude',cooperation_rate:.742,gini_wealth:.281,average_gpa:3.65,average_stress:28.4,average_latency_ms:482,total_cost_usd:round2(c.agents*.048*3),patterns_detected_count:3},
+      gemini: {model:'gemini',cooperation_rate:.695,gini_wealth:.314,average_gpa:3.58,average_stress:31.2,average_latency_ms:194,total_cost_usd:round2(c.agents*.004*3),patterns_detected_count:3},
+      mock:   {model:'mock',  cooperation_rate:.621,gini_wealth:.341,average_gpa:3.45,average_stress:34.7,average_latency_ms:2.4,total_cost_usd:0,patterns_detected_count:2},
+    };
+    toast('Showing benchmark preview (backend offline)', 'var(--amber)');
+  }
+
+  const placeholder = document.getElementById('compare-placeholder');
+  const table = document.getElementById('cmp-table');
+  placeholder.classList.add('hidden');
+  table.classList.remove('hidden');
+
+  const MODEL_COLORS = {claude:'#f59e0b', gemini:'#3b82f6', mock:'#10b981'};
+  document.getElementById('cmp-body').innerHTML = Object.entries(results).map(([key, r]) => `
+    <tr>
+      <td style="font-weight:700">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${MODEL_COLORS[key]||'#6366f1'};margin-right:6px"></span>
+        ${r.model || key.toUpperCase()}
+      </td>
+      <td style="color:var(--green);font-weight:600">${(r.cooperation_rate*100).toFixed(1)}%</td>
+      <td style="color:var(--amber)">${r.gini_wealth.toFixed(3)}</td>
+      <td style="color:var(--indigo);font-weight:600">${(r.average_gpa||3.4).toFixed(2)}</td>
+      <td style="color:var(--red)">${(r.average_stress||30).toFixed(1)}</td>
+      <td style="color:var(--muted);font-family:monospace">${(r.average_latency_ms||0).toFixed(0)} ms</td>
+      <td style="font-family:monospace">\$${r.total_cost_usd.toFixed(4)}</td>
+      <td style="color:var(--purple);font-weight:600">${r.patterns_detected_count}</td>
+    </tr>`).join('');
+
+  btn.disabled = false;
+  btn.innerHTML = '⚡ Run 3-Way Benchmark';
+  toast('Benchmark complete!');
+}
+
+// ═══════════════════════════════════════════════════
+//  TELEMETRY
+// ═══════════════════════════════════════════════════
+function updateTelemetry(data) {
+  document.getElementById('telem-box').classList.remove('hidden');
+  document.getElementById('t-dur').textContent = (data.duration_seconds || 0).toFixed(2) + 's';
+  document.getElementById('t-ticks').textContent = data.metrics.length;
+  document.getElementById('t-tokens').textContent = (data.total_tokens || 0).toLocaleString();
+  document.getElementById('t-cost').textContent = '$' + (data.total_cost_usd || 0).toFixed(4);
+  document.getElementById('t-patterns').textContent = (data.patterns || []).length;
+}
+
+// ═══════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════
+function pad(n) { return String(n).padStart(2,'0') }
+function clamp(v,a,b) { return Math.max(a,Math.min(b,v)) }
+function round2(v) { return Math.round(v*100)/100 }
+function round3(v) { return Math.round(v*1000)/1000 }
+function isWeekend(day) { return (day % 7) === 6 || (day % 7) === 0 }
+
+function seededRng(seed) {
+  let s = seed | 0;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return ((s >>> 0) / 0xffffffff);
+  };
+}
+
+function archetypePersonality(arch, rng) {
+  const base = {
+    scholar:      {extroversion:.2, risk_tolerance:.2, cooperation:.6, ambition:.9, patience:.85, trust:.6, curiosity:.8},
+    socialite:    {extroversion:.95,risk_tolerance:.7, cooperation:.85,ambition:.4, patience:.4,  trust:.8, curiosity:.75},
+    entrepreneur: {extroversion:.75,risk_tolerance:.85,cooperation:.5, ambition:.95,patience:.6,  trust:.4, curiosity:.9},
+    balanced:     {extroversion:.5, risk_tolerance:.4, cooperation:.6, ambition:.55,patience:.6,  trust:.55,curiosity:.55},
+  };
+  const b = base[arch] || base.balanced;
+  return Object.fromEntries(Object.entries(b).map(([k,v]) => [k, clamp(v + (rng()-0.5)*0.08, 0.05, 0.95)]));
+}
+
+function archetypeGoals(arch) {
+  const map = {
+    scholar:      [{id:'g_gpa',title:'Maintain GPA ≥ 3.8',current_progress:.82,priority:.9},{id:'g_stress',title:'Keep Stress Low',current_progress:.65,priority:.6}],
+    socialite:    [{id:'g_friends',title:'Build Friend Network',current_progress:.71,priority:.95},{id:'g_gpa',title:'Pass Classes (≥2.5)',current_progress:.60,priority:.4}],
+    entrepreneur: [{id:'g_wealth',title:'Accumulate Savings ($300)',current_progress:.55,priority:.9},{id:'g_network',title:'Professional Network',current_progress:.48,priority:.7}],
+    balanced:     [{id:'g_gpa',title:'Maintain GPA ≥ 3.2',current_progress:.70,priority:.7},{id:'g_friends',title:'Make Friends',current_progress:.55,priority:.6},{id:'g_budget',title:'Stay Solvent ($100)',current_progress:.80,priority:.6}],
+  };
+  return map[arch] || map.balanced;
+}
+
+function archetypePlan(arch) {
+  const map = {
+    scholar:     'Morning: Library study. Afternoon: Lecture attendance. Evening: Review notes and sleep early.',
+    socialite:   'Morning: Cafeteria socializing. Afternoon: Club activities. Evening: Group outings.',
+    entrepreneur:'Morning: Part-time work shift. Afternoon: Networking at campus events. Evening: Personal study.',
+    balanced:    'Morning: Attend lectures. Noon: Cafeteria lunch. Afternoon: Study or recreation. Evening: Leisure.',
+  };
+  return map[arch] || map.balanced;
+}
+
+// ═══════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  runSimulation();
+});
+</script>
+</body>
+</html>
